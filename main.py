@@ -1,10 +1,12 @@
 import configparser
 import getpass
+import io
 import os
 import shutil
 import socket
 import sys
 import tkinter as tk
+import zipfile
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 from tkinter.font import Font
@@ -165,35 +167,41 @@ class FileTransferLogger:
             row=0, column=3, sticky="ew", padx=5, pady=5)
 
         ttk.Label(right_frame, text="Selected Files:").grid(row=2,
-                                                                    column=0, sticky="w", padx=5, pady=5)
+                                                            column=0, sticky="w", padx=5, pady=5)
 
         # Add a frame to hold the listbox and scrollbar
         listbox_frame = ttk.Frame(right_frame)
-        listbox_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+        listbox_frame.grid(row=3, column=0, columnspan=2,
+                           sticky="nsew", padx=5, pady=5)
 
         # Configure the frame to expand
         listbox_frame.grid_rowconfigure(0, weight=1)
         listbox_frame.grid_columnconfigure(0, weight=1)
 
         # Add the listbox
-        self.file_listbox = tk.Listbox(listbox_frame, height=10, width=60, selectmode=tk.MULTIPLE)
+        self.file_listbox = tk.Listbox(
+            listbox_frame, height=10, width=60, selectmode=tk.MULTIPLE)
         self.file_listbox.grid(row=0, column=0, sticky="nsew")
 
         # Add a vertical scrollbar
-        scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.file_listbox.yview)
+        scrollbar = ttk.Scrollbar(
+            listbox_frame, orient="vertical", command=self.file_listbox.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.file_listbox.config(yscrollcommand=scrollbar.set)
 
         # Add file count label and Generate Logs button
         file_count_frame = ttk.Frame(right_frame)
-        file_count_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
+        file_count_frame.grid(row=5, column=0, columnspan=2,
+                              sticky="ew", padx=5, pady=5)
 
         # Configure column weights to allow the label to expand
-        file_count_frame.columnconfigure(0, weight=1)  # File count label expands
+        file_count_frame.columnconfigure(
+            0, weight=1)  # File count label expands
         file_count_frame.columnconfigure(1, weight=0)  # Button stays fixed
 
         # File count label
-        self.file_count_label = ttk.Label(file_count_frame, text="Files Selected: 0")
+        self.file_count_label = ttk.Label(
+            file_count_frame, text="Files Selected: 0")
         self.file_count_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
         # Generate Logs button
@@ -215,7 +223,8 @@ class FileTransferLogger:
         for file in self.selected_files:
             self.file_listbox.insert(tk.END, file)
         # Update the file count label
-        self.file_count_label.config(text=f"Files Selected: {len(self.selected_files)}")
+        self.file_count_label.config(
+            text=f"Files Selected: {len(self.selected_files)}")
 
     def select_files(self):
         files = filedialog.askopenfilenames(
@@ -290,7 +299,8 @@ class FileTransferLogger:
         # Generate the file_list_log_name
         current_date = datetime.now().strftime("%Y%m%d")
         username = self.username
-        transfer_type_abbr = self.transfer_types.get(self.transfer_type_var.get(), "UNK")
+        transfer_type_abbr = self.transfer_types.get(
+            self.transfer_type_var.get(), "UNK")
         source = self.source_var.get()
         destination = self.destination_var.get()
         base_name = f"{current_date}_{username}_{transfer_type_abbr}_{source}-{destination}"
@@ -299,27 +309,75 @@ class FileTransferLogger:
         counter = 1
         while True:
             file_list_log_name = f"{base_name}_{counter:03d}.log"
-            file_list_log_path = os.path.join(self.log_output_folder, file_list_log_name)
+            file_list_log_path = os.path.join(
+                self.log_output_folder, file_list_log_name)
             if not os.path.exists(file_list_log_path):
                 break
             counter += 1
 
         # Write the selected files and their sizes to the file list log
-        total_file_count = len(self.selected_files)
+        total_file_count = 0
         with open(file_list_log_path, "w") as file_list_log:
             # Write the header
-            file_list_log.write('"File Name","File Size"\n')
+            file_list_log.write('"Level","Container","FullName","Size"\n')
+
+            def write_file_entry(level, container, full_name, size):
+                """Helper function to write a file entry to the log."""
+                file_list_log.write(
+                    f'"{level}","{container}","{full_name}","{size}"\n')
+
+            def process_zip_file(zip_path_or_file, level, container_name=None):
+                """Process a ZIP file and write its contents to the log."""
+                try:
+                    # Open the ZIP file (can be a file path or a file-like object)
+                    with zipfile.ZipFile(zip_path_or_file, 'r') as zip_ref:
+                        for file_info in zip_ref.infolist():
+                            # Only log files, not directories
+                            if not file_info.is_dir():
+                                # Use the provided container name or fallback to the current ZIP file name
+                                current_container = container_name or os.path.basename(
+                                    zip_ref.filename or "In-Memory ZIP")
+                                write_file_entry(
+                                    level + 1, current_container, file_info.filename, file_info.file_size)
+
+                                # Check if the file inside the ZIP is another ZIP file
+                                if file_info.filename.endswith(".zip"):
+                                    # Extract the nested ZIP file to memory
+                                    with zip_ref.open(file_info.filename) as nested_zip_file:
+                                        # Use BytesIO to handle the nested ZIP file in memory
+                                        nested_zip_data = io.BytesIO(
+                                            nested_zip_file.read())
+                                        # Recursively process the nested ZIP file
+                                        process_zip_file(
+                                            nested_zip_data, level + 1, file_info.filename)
+                except zipfile.BadZipFile:
+                    messagebox.showerror(
+                        "Error", f"Invalid ZIP file: {zip_path_or_file}")
+                except Exception as e:
+                    messagebox.showerror(
+                        "Error", f"An error occurred while processing ZIP file: {zip_path_or_file}\n{e}")
+
+            # Process each selected file
             for file in self.selected_files:
-                file_size = os.path.getsize(file)  # Get file size in bytes
-                file_list_log.write(f'"{file}","{file_size}"\n')
+                if os.path.isfile(file):
+                    file_size = os.path.getsize(file)
+                    write_file_entry(0, "", file, file_size)
+                    total_file_count += 1
+
+                    # If the file is a ZIP file, process its contents
+                    if file.endswith(".zip"):
+                        process_zip_file(file, 0)
 
         # Generate the transfer log file name
-        transfer_log_name = f"TransferLog_{current_date}.log"
-        transfer_log_path = os.path.join(self.log_output_folder, transfer_log_name)
+        current_year = datetime.now().strftime("%Y")  # Get only the 4-digit year
+        transfer_log_name = f"TransferLog_{current_year}.log"
+        transfer_log_path = os.path.join(
+            self.log_output_folder, transfer_log_name)
 
         # Append transfer details to the transfer log
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        transfer_date = datetime.now().strftime("%Y-%m-%d")
+        transfer_date = datetime.strptime(
+            self.date_var.get(), "%m/%d/%Y").strftime("%Y-%m-%d")
         transfer_log_entry = (
             f'"{timestamp}","{transfer_date}","{username}","{self.computername}",'
             f'"{self.media_type_var.get()}","{self.media_id_var.get()}",'
@@ -341,7 +399,7 @@ class FileTransferLogger:
 
         # Notify the user
         messagebox.showinfo("Success", f"File list log saved successfully as {file_list_log_name}.\n"
-                                       f"Transfer log updated: {transfer_log_name}.")
+                            f"Transfer log updated: {transfer_log_name}.")
 
     def show_source_destination_warning(self):
         warning_window = tk.Toplevel(self.root)
