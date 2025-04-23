@@ -120,17 +120,17 @@ class FileTransferLogger:
         date_entry = DateEntry(
             left_frame, textvariable=self.date_var, width=37, date_pattern="mm/dd/yyyy", maxdate=datetime.now()
         )
-        date_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        date_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
         ttk.Label(left_frame, text="Username:").grid(
             row=1, column=0, sticky="w", padx=5, pady=5)
         ttk.Entry(left_frame, textvariable=self.username_var, width=40,
-                  state="readonly").grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+                  state="readonly").grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
         ttk.Label(left_frame, text="Computer Name:").grid(
             row=2, column=0, sticky="w", padx=5, pady=5)
         ttk.Entry(left_frame, textvariable=self.computername_var, width=40,
-                  state="readonly").grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+                  state="readonly").grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
         self._add_combobox(left_frame, "Media Type:",
                            self.media_type_var, self.media_types, 3)
