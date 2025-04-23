@@ -1,14 +1,14 @@
-import sys
+import configparser
+import getpass
 import os
 import shutil
-import configparser
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from tkcalendar import DateEntry
-from datetime import datetime
-import getpass
 import socket
+import sys
+import tkinter as tk
+from datetime import datetime
+from tkinter import filedialog, messagebox, ttk
 from tkinter.font import Font
+from tkcalendar import DateEntry
 
 
 class FileTransferLogger:
@@ -164,12 +164,25 @@ class FileTransferLogger:
         ttk.Button(button_frame, text="Remove Selected", command=self.remove_selected_file).grid(
             row=0, column=3, sticky="ew", padx=5, pady=5)
 
-        ttk.Label(right_frame, text="Selected Files/Folders:").grid(row=2,
+        ttk.Label(right_frame, text="Selected Files:").grid(row=2,
                                                                     column=0, sticky="w", padx=5, pady=5)
-        self.file_listbox = tk.Listbox(
-            right_frame, height=10, width=60, selectmode=tk.MULTIPLE)
-        self.file_listbox.grid(row=3, column=0, columnspan=2,
-                               sticky="nsew", padx=5, pady=5)
+
+        # Add a frame to hold the listbox and scrollbar
+        listbox_frame = ttk.Frame(right_frame)
+        listbox_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+
+        # Configure the frame to expand
+        listbox_frame.grid_rowconfigure(0, weight=1)
+        listbox_frame.grid_columnconfigure(0, weight=1)
+
+        # Add the listbox
+        self.file_listbox = tk.Listbox(listbox_frame, height=10, width=60, selectmode=tk.MULTIPLE)
+        self.file_listbox.grid(row=0, column=0, sticky="nsew")
+
+        # Add a vertical scrollbar
+        scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.file_listbox.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.file_listbox.config(yscrollcommand=scrollbar.set)
 
         # Add file count label and Generate Logs button
         file_count_frame = ttk.Frame(right_frame)
@@ -196,6 +209,14 @@ class FileTransferLogger:
         if strict:
             combobox.state(["readonly"])
 
+    def _update_listbox(self):
+        self.selected_files = sorted(self.selected_files)
+        self.file_listbox.delete(0, tk.END)  # Clear the listbox
+        for file in self.selected_files:
+            self.file_listbox.insert(tk.END, file)
+        # Update the file count label
+        self.file_count_label.config(text=f"Files Selected: {len(self.selected_files)}")
+
     def select_files(self):
         files = filedialog.askopenfilenames(
             title="Select Files", multiple=True
@@ -204,12 +225,8 @@ class FileTransferLogger:
         for file in files:
             if file not in self.selected_files:
                 self.selected_files.append(file)
-                self.file_listbox.insert(tk.END, file)
 
-        # Update the file count label
-        self.file_count_label.config(
-            text=f"Files Selected: {len(self.selected_files)}"
-        )
+        self._update_listbox()
 
     def select_folders(self):
         folder = filedialog.askdirectory(title="Select Folder")
@@ -219,32 +236,8 @@ class FileTransferLogger:
                     file_path = os.path.join(root, name)
                     if file_path not in self.selected_files:
                         self.selected_files.append(file_path)
-                        self.file_listbox.insert(tk.END, file_path)
 
-        # Update the file count label
-        self.file_count_label.config(
-            text=f"Files Selected: {len(self.selected_files)}"
-        )
-
-    def select_files_and_folders(self):
-        files = filedialog.askopenfilenames(
-            title="Select Files", multiple=True)
-        folder = filedialog.askdirectory(title="Select Folder (optional)")
-
-        selected = list(files)
-        if folder:
-            for root, _, filenames in os.walk(folder):
-                for name in filenames:
-                    selected.append(os.path.join(root, name))
-
-        # Add selected files to the listbox and internal list
-        for file in selected:
-            if file not in self.selected_files:
-                self.selected_files.append(file)
-                self.file_listbox.insert(tk.END, file)
-
-        self.file_count_label.config(
-            text=f"Files Selected: {len(self.selected_files)}")
+        self._update_listbox()
 
     def remove_selected_file(self):
         # Get all selected indices
@@ -256,18 +249,12 @@ class FileTransferLogger:
             self.selected_files.remove(file_to_remove)
             self.file_listbox.delete(index)
 
-        # Update the file count label
-        self.file_count_label.config(
-            text=f"Files Selected: {len(self.selected_files)}"
-        )
+        self._update_listbox()
 
     def clear_selected_files(self):
         # Clear the internal list and the Listbox
         self.selected_files.clear()
-        self.file_listbox.delete(0, tk.END)
-
-        # Update the file count label
-        self.file_count_label.config(text="Files Selected: 0")
+        self._update_listbox()
 
     def save_logs(self):
         # Check if mandatory fields are filled
