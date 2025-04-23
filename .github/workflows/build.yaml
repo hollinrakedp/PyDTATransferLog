@@ -35,6 +35,9 @@ jobs:
         run: |
           pyinstaller main.spec
 
+      - name: Verify dist directory
+        run: ls -R dist
+
       # Step 5: Upload the executable as an artifact
       - name: Upload executable
         uses: actions/upload-artifact@v3
