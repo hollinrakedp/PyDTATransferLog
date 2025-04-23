@@ -1,0 +1,43 @@
+name: Build Executable
+
+on:
+  push:
+    branches:
+      - main  # Trigger the workflow on pushes to the 'main' branch
+  pull_request:
+    branches:
+      - main  # Trigger the workflow on pull requests to the 'main' branch
+
+jobs:
+  build:
+    runs-on: windows-latest  # Use the latest Ubuntu runner
+
+    steps:
+      # Step 1: Check out the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8  # Specify the Python version
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt  # Install dependencies from requirements.txt
+          pip install pyinstaller          # Install PyInstaller
+
+      # Step 4: Build the executable
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller main.spec
+
+      # Step 5: Upload the executable as an artifact
+      - name: Upload executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: dta-transfer-log-executable
+          path: dist/  # Upload the entire 'dist' directory
