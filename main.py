@@ -1,6 +1,7 @@
 import configparser
 import getpass
 import gzip
+import hashlib
 import io
 import os
 import shutil
@@ -65,6 +66,7 @@ class FileTransferLogger:
         self.log_output_var = tk.StringVar(value="")
         self.open_transfer_log_var = tk.BooleanVar(value=False)
         self.open_file_list_log_var = tk.BooleanVar(value=False)
+        self.include_sha256_var = tk.BooleanVar(value=False)
         self.username = getpass.getuser()
         self.computername = socket.gethostname()
 
@@ -172,6 +174,13 @@ class FileTransferLogger:
             text="Open File List Log",
             variable=self.open_file_list_log_var
         ).grid(row=0, column=1, sticky="w", padx=5)
+
+        # Add SHA-256 option checkbox
+        ttk.Checkbutton(
+            checkbox_frame,
+            text="Include SHA-256 Checksums",
+            variable=self.include_sha256_var
+        ).grid(row=0, column=2, sticky="w", padx=5)
 
         # Right Column Widgets
         ttk.Label(right_frame, text="Log Output Folder:").grid(
@@ -368,15 +377,41 @@ class FileTransferLogger:
                 break
             counter += 1
 
+        include_sha256 = self.include_sha256_var.get()
+
         # Write the selected files and their sizes to the file list log
         total_file_count = 0
         with open(file_list_log_path, "w") as file_list_log:
-            file_list_log.write('"Level","Container","FullName","Size"\n')
+            # Write header
+            if include_sha256:
+                file_list_log.write(
+                    '"Level","Container","FullName","Size","SHA256"\n')
+            else:
+                file_list_log.write('"Level","Container","FullName","Size"\n')
+
+            def sha256sum(filename):
+                """Compute SHA-256 hash of a file."""
+                h = hashlib.sha256()
+                try:
+                    with open(filename, "rb") as f:
+                        for chunk in iter(lambda: f.read(8192), b""):
+                            h.update(chunk)
+                    return h.hexdigest()
+                except Exception:
+                    return "ERROR"
 
             def write_file_entry(level, container, full_name, size):
                 """Helper function to write a file entry to the log."""
-                file_list_log.write(
-                    f'"{level}","{container}","{full_name}","{size}"\n')
+                if include_sha256:
+                    if os.path.isfile(full_name):
+                        sha256 = sha256sum(full_name)
+                    else:
+                        sha256 = ""  # No SHA256 for files inside archives or non-files
+                    file_list_log.write(
+                        f'"{level}","{container}","{full_name}","{size}","{sha256}"\n')
+                else:
+                    file_list_log.write(
+                        f'"{level}","{container}","{full_name}","{size}"\n')
 
             def process_zip_file(zip_path_or_file, level, container_name=None):
                 """Process a ZIP file and write its contents to the log."""
@@ -482,8 +517,21 @@ class FileTransferLogger:
                     messagebox.showerror(
                         "Error", f"An error occurred while processing GZ file: {gz_path_or_file}\n{e}")
 
+            # --- Progress Bar for File Processing ---
+            progress_window = tk.Toplevel(self.root)
+            progress_window.title("Generating Logs")
+            progress_window.geometry("350x100")
+            ttk.Label(progress_window, text="Processing files...").pack(pady=10)
+            progress = ttk.Progressbar(
+                progress_window, mode="determinate", length=300)
+            progress.pack(pady=10)
+            progress["maximum"] = len(self.selected_files)
+            progress["value"] = 0
+            self.root.update_idletasks()
+            # --- End Progress Bar Setup ---
+
             # Process each selected file
-            for file in self.selected_files:
+            for idx, file in enumerate(self.selected_files):
                 if os.path.isfile(file):
                     file_size = os.path.getsize(file)
                     write_file_entry(0, "", file, file_size)
@@ -495,6 +543,13 @@ class FileTransferLogger:
                         process_tar_file(file, 0)
                     elif file.endswith(".gz"):
                         process_gz_file(file, 0)
+
+                # --- Update Progress Bar ---
+                progress["value"] = idx + 1
+                progress_window.update()
+                # --- End Progress Update ---
+
+            progress_window.destroy()
 
         # Generate the transfer log file name
         current_year = datetime.now().strftime("%Y")
