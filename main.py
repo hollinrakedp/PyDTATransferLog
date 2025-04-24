@@ -239,6 +239,13 @@ class FileTransferLogger:
             row=0, column=1, sticky="e", padx=5, pady=5
         )
 
+        # Add status bar at the bottom
+        self.status_var = tk.StringVar(value="Ready")
+        status_bar = ttk.Label(self.root, textvariable=self.status_var,
+                               relief=tk.SUNKEN, anchor=tk.W, padding=(5, 2))
+        status_bar.grid(row=1, column=0, sticky="ew")
+        self.root.grid_rowconfigure(1, weight=0)
+
     def _add_combobox(self, frame, label, variable, options, row, strict=False):
         ttk.Label(frame, text=label).grid(
             row=row, column=0, sticky="w", padx=5, pady=5)
@@ -258,6 +265,7 @@ class FileTransferLogger:
             text=f"Files Selected: {len(self.selected_files)}")
 
     def select_files(self):
+        self.status_var.set("Selecting files...")
         files = filedialog.askopenfilenames(
             title="Select Files", multiple=True
         )
@@ -267,17 +275,33 @@ class FileTransferLogger:
                 self.selected_files.append(file)
 
         self._update_listbox()
+        self.status_var.set(f"Added {len(files)} files")
 
     def select_folders(self):
+        self.status_var.set("Selecting folder...")
         folder = filedialog.askdirectory(title="Select Folder")
         if folder:
+            self.status_var.set(f"Processing folder: {folder}")
+            self.root.update()  # Update the UI to show the status message
+
+            file_count = 0
             for root, _, filenames in os.walk(folder):
                 for name in filenames:
                     file_path = os.path.join(root, name)
                     if file_path not in self.selected_files:
                         self.selected_files.append(file_path)
+                        file_count += 1
 
-        self._update_listbox()
+                    # Update status periodically for large folders
+                    if file_count % 100 == 0:
+                        self.status_var.set(
+                            f"Added {file_count} files from {folder}")
+                        self.root.update_idletasks()  # Update UI without blocking
+
+            self._update_listbox()
+            self.status_var.set(f"Added {file_count} files from folder")
+        else:
+            self.status_var.set("Folder selection cancelled")
 
     def remove_selected_file(self):
         selected_indices = self.file_listbox.curselection()
@@ -504,6 +528,7 @@ class FileTransferLogger:
         # Notify the user
         messagebox.showinfo("Success", f"File list log saved successfully as {file_list_log_name}.\n"
                             f"Transfer log updated: {transfer_log_name}.")
+        self.status_var.set("Logs generated successfully")
 
         # Open the log files if the checkboxes are checked
         if self.open_transfer_log_var.get():
