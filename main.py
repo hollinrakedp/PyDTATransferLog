@@ -5,8 +5,10 @@ import os
 import shutil
 import socket
 import sys
+import tarfile
 import tkinter as tk
 import zipfile
+import gzip
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 from tkinter.font import Font
@@ -357,6 +359,65 @@ class FileTransferLogger:
                     messagebox.showerror(
                         "Error", f"An error occurred while processing ZIP file: {zip_path_or_file}\n{e}")
 
+            def process_tar_file(tar_path_or_file, level, container_name=None):
+                """Process a TAR file and write its contents to the log."""
+                try:
+                    # Open the TAR file (can be a file path or a file-like object)
+                    if isinstance(tar_path_or_file, str):
+                        tar_ref = tarfile.open(tar_path_or_file, mode="r:*")
+                    else:
+                        tar_ref = tarfile.open(fileobj=tar_path_or_file, mode="r:*")
+
+                    with tar_ref:
+                        for member in tar_ref.getmembers():
+                            # Only log files, not directories
+                            if member.isfile():
+                                # Use the provided container name or fallback to the current TAR file name
+                                current_container = container_name or os.path.basename(
+                                    tar_ref.name or "In-Memory TAR"
+                                )
+                                write_file_entry(
+                                    level + 1, current_container, member.name, member.size
+                                )
+
+                                # Check if the file inside the TAR is another TAR file
+                                if member.name.endswith(".tar"):
+                                    # Extract the nested TAR file to memory
+                                    nested_tar_data = tar_ref.extractfile(member)
+                                    if nested_tar_data:
+                                        # Recursively process the nested TAR file
+                                        process_tar_file(
+                                            io.BytesIO(nested_tar_data.read()), level + 1, member.name
+                                        )
+                except tarfile.TarError:
+                    messagebox.showerror(
+                        "Error", f"Invalid TAR file: {tar_path_or_file}"
+                    )
+                except Exception as e:
+                    messagebox.showerror(
+                        "Error", f"An error occurred while processing TAR file: {tar_path_or_file}\n{e}"
+                    )
+
+            def process_gz_file(gz_path_or_file, level, container_name=None):
+                """Process a GZ file and write its contents to the log."""
+                try:
+                    # Open the GZ file (can be a file path or a file-like object)
+                    with gzip.open(gz_path_or_file, mode="rb") as gz_ref:
+                        # Use the provided container name or fallback to the current GZ file name
+                        current_container = container_name or os.path.basename(
+                            gz_path_or_file if isinstance(gz_path_or_file, str) else "In-Memory GZ")
+                        # GZ files typically contain a single file, so we log it as-is
+                        extracted_file_name = current_container.replace(".gz", "")
+                        extracted_file_size = len(gz_ref.read())
+                        write_file_entry(
+                            level + 1, current_container, extracted_file_name, extracted_file_size)
+                except gzip.BadGzipFile:
+                    messagebox.showerror(
+                        "Error", f"Invalid GZ file: {gz_path_or_file}")
+                except Exception as e:
+                    messagebox.showerror(
+                        "Error", f"An error occurred while processing GZ file: {gz_path_or_file}\n{e}")
+
             # Process each selected file
             for file in self.selected_files:
                 if os.path.isfile(file):
@@ -367,6 +428,12 @@ class FileTransferLogger:
                     # If the file is a ZIP file, process its contents
                     if file.endswith(".zip"):
                         process_zip_file(file, 0)
+                    # If the file is a TAR file, process its contents
+                    elif file.endswith(".tar"):
+                        process_tar_file(file, 0)
+                    # If the file is a GZ file, process its contents
+                    elif file.endswith(".gz"):
+                        process_gz_file(file, 0)
 
         # Generate the transfer log file name
         current_year = datetime.now().strftime("%Y")  # Get only the 4-digit year
