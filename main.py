@@ -230,10 +230,11 @@ class FileTransferLogger:
         )
 
     def _add_combobox(self, frame, label, variable, options, row, strict=False):
-        ttk.Label(frame, text=label).grid(row=row, column=0, sticky=tk.W)
+        ttk.Label(frame, text=label).grid(
+            row=row, column=0, sticky="w", padx=5, pady=5)
         combobox = ttk.Combobox(
             frame, textvariable=variable, values=options, width=37)
-        combobox.grid(row=row, column=1, sticky=tk.W)
+        combobox.grid(row=row, column=1, sticky="w", padx=5, pady=5)
         if strict:
             combobox.state(["readonly"])
 
