@@ -14,6 +14,7 @@ from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 from tkinter.font import Font
 from tkcalendar import DateEntry
+from ttkthemes import ThemedTk
 
 
 class FileTransferLogger:
@@ -36,6 +37,15 @@ class FileTransferLogger:
         # Load the config file
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
+
+        # Apply theme if using ThemedTk
+        if isinstance(self.root, ThemedTk):
+            theme = self.config.get("UI", "Theme", fallback="arc")
+            try:
+                self.root.set_theme(theme)
+            except:
+                # Fallback to default theme if the specified theme is not available
+                self.root.set_theme("arc")
 
         # Update the icon path to use the resources folder
         icon_path = os.path.join(os.path.dirname(
@@ -558,6 +568,6 @@ class FileTransferLogger:
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ThemedTk(theme="arc")  # Use ThemedTk instead of tk.Tk
     app = FileTransferLogger(root)
     root.mainloop()
