@@ -591,6 +591,27 @@ class FileTransferLogger:
         warning_window.wait_window()
         return confirm_var.get()
 
+    def process_large_collection(self, files):
+        """Process a large collection of files with progress updates."""
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("Processing Files")
+        progress_window.geometry("300x100")
+
+        ttk.Label(progress_window, text="Processing files...").pack(pady=10)
+        progress = ttk.Progressbar(
+            progress_window, mode="determinate", length=250)
+        progress.pack(pady=10)
+
+        total_files = len(files)
+        progress["maximum"] = total_files
+
+        for i, file in enumerate(files):
+            self.process_file(file)
+            progress["value"] = i + 1
+            progress_window.update()
+
+        progress_window.destroy()
+
 
 if __name__ == "__main__":
     root = ThemedTk(theme="arc")  # Use ThemedTk instead of tk.Tk
