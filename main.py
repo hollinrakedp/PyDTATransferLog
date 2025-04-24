@@ -139,12 +139,12 @@ class FileTransferLogger:
 
         ttk.Label(left_frame, text="Username:").grid(
             row=1, column=0, sticky="w", padx=5, pady=5)
-        ttk.Entry(left_frame, textvariable=self.username_var, width=40,
+        ttk.Entry(left_frame, textvariable=self.username_var, width=39,
                   state="readonly").grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
         ttk.Label(left_frame, text="Computer Name:").grid(
             row=2, column=0, sticky="w", padx=5, pady=5)
-        ttk.Entry(left_frame, textvariable=self.computername_var, width=40,
+        ttk.Entry(left_frame, textvariable=self.computername_var, width=39,
                   state="readonly").grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
         self._add_combobox(left_frame, "Media Type:",
