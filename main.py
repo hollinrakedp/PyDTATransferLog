@@ -1,5 +1,6 @@
 import configparser
 import getpass
+import gzip
 import io
 import os
 import shutil
@@ -8,7 +9,6 @@ import sys
 import tarfile
 import tkinter as tk
 import zipfile
-import gzip
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 from tkinter.font import Font
@@ -22,9 +22,9 @@ class FileTransferLogger:
 
         # Determine the base path (for PyInstaller or normal execution)
         if hasattr(sys, '_MEIPASS'):
-            base_path = sys._MEIPASS  # Temporary directory for PyInstaller
+            base_path = sys._MEIPASS
         else:
-            base_path = os.path.dirname(__file__)  # Normal execution
+            base_path = os.path.dirname(__file__)
 
         # Ensure config.ini exists in the current working directory
         config_path = os.path.join(os.getcwd(), "config.ini")
@@ -168,8 +168,8 @@ class FileTransferLogger:
         ttk.Button(button_frame, text="Remove Selected", command=self.remove_selected_file).grid(
             row=0, column=3, sticky="ew", padx=5, pady=5)
 
-        ttk.Label(right_frame, text="Selected Files:").grid(row=2,
-                                                            column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(right_frame, text="Selected Files:").grid(
+            row=2, column=0, sticky="w", padx=5, pady=5)
 
         # Add a frame to hold the listbox and scrollbar
         listbox_frame = ttk.Frame(right_frame)
@@ -197,9 +197,8 @@ class FileTransferLogger:
                               sticky="ew", padx=5, pady=5)
 
         # Configure column weights to allow the label to expand
-        file_count_frame.columnconfigure(
-            0, weight=1)  # File count label expands
-        file_count_frame.columnconfigure(1, weight=0)  # Button stays fixed
+        file_count_frame.columnconfigure(0, weight=1)
+        file_count_frame.columnconfigure(1, weight=0)
 
         # File count label
         self.file_count_label = ttk.Label(
@@ -251,10 +250,8 @@ class FileTransferLogger:
         self._update_listbox()
 
     def remove_selected_file(self):
-        # Get all selected indices
         selected_indices = self.file_listbox.curselection()
         # Remove files from the internal list and the Listbox
-        # Reverse to avoid index shifting issues
         for index in reversed(selected_indices):
             file_to_remove = self.file_listbox.get(index)
             self.selected_files.remove(file_to_remove)
@@ -320,7 +317,6 @@ class FileTransferLogger:
         # Write the selected files and their sizes to the file list log
         total_file_count = 0
         with open(file_list_log_path, "w") as file_list_log:
-            # Write the header
             file_list_log.write('"Level","Container","FullName","Size"\n')
 
             def write_file_entry(level, container, full_name, size):
@@ -366,7 +362,8 @@ class FileTransferLogger:
                     if isinstance(tar_path_or_file, str):
                         tar_ref = tarfile.open(tar_path_or_file, mode="r:*")
                     else:
-                        tar_ref = tarfile.open(fileobj=tar_path_or_file, mode="r:*")
+                        tar_ref = tarfile.open(
+                            fileobj=tar_path_or_file, mode="r:*")
 
                     with tar_ref:
                         for member in tar_ref.getmembers():
@@ -383,11 +380,13 @@ class FileTransferLogger:
                                 # Check if the file inside the TAR is another TAR file
                                 if member.name.endswith(".tar"):
                                     # Extract the nested TAR file to memory
-                                    nested_tar_data = tar_ref.extractfile(member)
+                                    nested_tar_data = tar_ref.extractfile(
+                                        member)
                                     if nested_tar_data:
                                         # Recursively process the nested TAR file
                                         process_tar_file(
-                                            io.BytesIO(nested_tar_data.read()), level + 1, member.name
+                                            io.BytesIO(
+                                                nested_tar_data.read()), level + 1, member.name
                                         )
                 except tarfile.TarError:
                     messagebox.showerror(
@@ -407,7 +406,8 @@ class FileTransferLogger:
                         current_container = container_name or os.path.basename(
                             gz_path_or_file if isinstance(gz_path_or_file, str) else "In-Memory GZ")
                         # GZ files typically contain a single file, so we log it as-is
-                        extracted_file_name = current_container.replace(".gz", "")
+                        extracted_file_name = current_container.replace(
+                            ".gz", "")
                         extracted_file_size = len(gz_ref.read())
                         write_file_entry(
                             level + 1, current_container, extracted_file_name, extracted_file_size)
@@ -425,13 +425,10 @@ class FileTransferLogger:
                     write_file_entry(0, "", file, file_size)
                     total_file_count += 1
 
-                    # If the file is a ZIP file, process its contents
                     if file.endswith(".zip"):
                         process_zip_file(file, 0)
-                    # If the file is a TAR file, process its contents
                     elif file.endswith(".tar"):
                         process_tar_file(file, 0)
-                    # If the file is a GZ file, process its contents
                     elif file.endswith(".gz"):
                         process_gz_file(file, 0)
 
@@ -472,7 +469,7 @@ class FileTransferLogger:
         warning_window = tk.Toplevel(self.root)
         warning_window.title("Warning")
         warning_window.geometry("400x200")
-        warning_window.grab_set()  # Make the dialog modal
+        warning_window.grab_set()
 
         ttk.Label(
             warning_window, text="Source and Destination are the same which is highly unusual.").pack(pady=10)
@@ -484,7 +481,6 @@ class FileTransferLogger:
         )
         confirm_checkbox.pack(pady=10)
 
-        # Create the Confirm button and bind its state to the checkbox
         confirm_button = ttk.Button(
             warning_window, text="Confirm", state="disabled", command=warning_window.destroy)
 
@@ -496,7 +492,6 @@ class FileTransferLogger:
         cancel_button = ttk.Button(
             warning_window, text="Cancel", command=on_cancel)
 
-        # Swap the positions of the Cancel and Confirm buttons
         cancel_button.pack(side=tk.LEFT, padx=20, pady=20)
         confirm_button.pack(side=tk.RIGHT, padx=20, pady=20)
 
@@ -509,7 +504,7 @@ class FileTransferLogger:
 
         confirm_var.trace_add("write", toggle_confirm_button)
 
-        warning_window.wait_window()  # Wait for the dialog to close
+        warning_window.wait_window()
         return confirm_var.get()
 
 
