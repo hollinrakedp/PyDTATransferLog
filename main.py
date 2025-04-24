@@ -405,12 +405,22 @@ class FileTransferLogger:
                         # Use the provided container name or fallback to the current GZ file name
                         current_container = container_name or os.path.basename(
                             gz_path_or_file if isinstance(gz_path_or_file, str) else "In-Memory GZ")
-                        # GZ files typically contain a single file, so we log it as-is
+
+                        # Read the content
+                        content = gz_ref.read()
+                        extracted_file_size = len(content)
+
                         extracted_file_name = current_container.replace(
                             ".gz", "")
-                        extracted_file_size = len(gz_ref.read())
                         write_file_entry(
                             level + 1, current_container, extracted_file_name, extracted_file_size)
+
+                        # If the extracted file is a tar file, process it recursively
+                        if extracted_file_name.endswith(".tar"):
+                            # Use BytesIO to handle the extracted tar file in memory
+                            extracted_tar_data = io.BytesIO(content)
+                            process_tar_file(
+                                extracted_tar_data, level + 1, extracted_file_name)
                 except gzip.BadGzipFile:
                     messagebox.showerror(
                         "Error", f"Invalid GZ file: {gz_path_or_file}")
@@ -433,7 +443,7 @@ class FileTransferLogger:
                         process_gz_file(file, 0)
 
         # Generate the transfer log file name
-        current_year = datetime.now().strftime("%Y")  # Get only the 4-digit year
+        current_year = datetime.now().strftime("%Y")
         transfer_log_name = f"TransferLog_{current_year}.log"
         transfer_log_path = os.path.join(
             self.log_output_folder, transfer_log_name)
