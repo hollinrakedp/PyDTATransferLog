@@ -1,3 +1,4 @@
+import argparse
 import configparser
 import getpass
 import gzip
@@ -668,7 +669,99 @@ class FileTransferLogger:
         progress_window.destroy()
 
 
+def run_cli():
+    # Load config.ini to get allowed transfer types
+    config = configparser.ConfigParser()
+    config.read(os.path.join(os.getcwd(), "config.ini"))
+    transfer_types = {}
+    if config.has_option("TransferTypes", "Options"):
+        for pair in config.get("TransferTypes", "Options").split(","):
+            if ":" in pair:
+                long, short = pair.split(":", 1)
+                transfer_types[long.strip()] = short.strip()
+    # Build a set of all valid options (long and short)
+    valid_transfer_types = set(transfer_types.keys()) | set(
+        transfer_types.values())
+
+    parser = argparse.ArgumentParser(description="DTA File Transfer Log CLI")
+    parser.add_argument("--media-type", required=True, help="Media type")
+    parser.add_argument("--media-id", required=True, help="Media ID")
+    parser.add_argument("--transfer-type", required=True, choices=valid_transfer_types,
+                        help=f"Transfer type ({', '.join(valid_transfer_types)})")
+    parser.add_argument("--source", required=True, help="Source")
+    parser.add_argument("--destination", required=True, help="Destination")
+    parser.add_argument("--files", nargs="*", default=[], help="Files to log")
+    parser.add_argument("--folders", nargs="*", default=[],
+                        help="Folders to log (recursively)")
+    parser.add_argument("--output", help="Log output folder")
+    parser.add_argument("--sha256", action="store_true",
+                        help="Include SHA-256 checksums")
+    args = parser.parse_args()
+
+    # Normalize transfer_type to short name
+    if args.transfer_type in transfer_types:
+        transfer_type_abbr = transfer_types[args.transfer_type]
+    else:
+        transfer_type_abbr = args.transfer_type
+
+    # Collect all files from --files and recursively from --folders
+    all_files = []
+    for file in args.files:
+        all_files.append(file)
+    for folder in args.folders:
+        for root, _, filenames in os.walk(folder):
+            for name in filenames:
+                all_files.append(os.path.join(root, name))
+
+    # Minimal non-GUI log generation
+    from datetime import datetime
+
+    log_output_folder = args.output or "./logs"
+    os.makedirs(log_output_folder, exist_ok=True)
+    current_date = datetime.now().strftime("%Y%m%d")
+    username = getpass.getuser()
+    base_name = f"{current_date}_{username}_{transfer_type_abbr}_{args.source}-{args.destination}"
+    counter = 1
+    while True:
+        file_list_log_name = f"{base_name}_{counter:03d}.log"
+        file_list_log_path = os.path.join(
+            log_output_folder, file_list_log_name)
+        if not os.path.exists(file_list_log_path):
+            break
+        counter += 1
+
+    def sha256sum(filename):
+        h = hashlib.sha256()
+        try:
+            with open(filename, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+        except Exception:
+            return "ERROR"
+
+    with open(file_list_log_path, "w") as file_list_log:
+        if args.sha256:
+            file_list_log.write(
+                '"Level","Container","FullName","Size","SHA256"\n')
+        else:
+            file_list_log.write('"Level","Container","FullName","Size"\n')
+        for file in all_files:
+            size = os.path.getsize(file) if os.path.isfile(file) else ""
+            if args.sha256 and os.path.isfile(file):
+                sha256 = sha256sum(file)
+                file_list_log.write(f'"0","","{file}","{size}","{sha256}"\n')
+            elif args.sha256:
+                file_list_log.write(f'"0","","{file}","{size}",""\n')
+            else:
+                file_list_log.write(f'"0","","{file}","{size}"\n')
+    print(f"File list log saved: {file_list_log_path}")
+
+
 if __name__ == "__main__":
-    root = ThemedTk(theme="arc")  # Use ThemedTk instead of tk.Tk
-    app = FileTransferLogger(root)
-    root.mainloop()
+    if len(sys.argv) > 1:
+        run_cli()
+    else:
+        root = ThemedTk(theme="arc")
+        app = FileTransferLogger(root)
+        root.mainloop()
