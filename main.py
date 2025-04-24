@@ -5,6 +5,7 @@ import io
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tarfile
 import tkinter as tk
@@ -52,6 +53,8 @@ class FileTransferLogger:
         self.source_var = tk.StringVar()
         self.destination_var = tk.StringVar()
         self.log_output_var = tk.StringVar(value="")
+        self.open_transfer_log_var = tk.BooleanVar(value=False)
+        self.open_file_list_log_var = tk.BooleanVar(value=False)
         self.username = getpass.getuser()
         self.computername = socket.gethostname()
 
@@ -143,6 +146,22 @@ class FileTransferLogger:
                            self.source_var, self.network_list, 6)
         self._add_combobox(left_frame, "Destination:",
                            self.destination_var, self.network_list, 7)
+
+        checkbox_frame = ttk.Frame(left_frame)
+        checkbox_frame.grid(row=8, column=0, columnspan=2,
+                            sticky="e", padx=5, pady=5)
+
+        ttk.Checkbutton(
+            checkbox_frame,
+            text="Open Transfer Log",
+            variable=self.open_transfer_log_var
+        ).grid(row=0, column=0, sticky="w", padx=5)
+
+        ttk.Checkbutton(
+            checkbox_frame,
+            text="Open File List Log",
+            variable=self.open_file_list_log_var
+        ).grid(row=0, column=1, sticky="w", padx=5)
 
         # Right Column Widgets
         ttk.Label(right_frame, text="Log Output Folder:").grid(
@@ -474,6 +493,25 @@ class FileTransferLogger:
         # Notify the user
         messagebox.showinfo("Success", f"File list log saved successfully as {file_list_log_name}.\n"
                             f"Transfer log updated: {transfer_log_name}.")
+
+        # Open the log files if the checkboxes are checked
+        if self.open_transfer_log_var.get():
+            self.open_file(transfer_log_path)
+
+        if self.open_file_list_log_var.get():
+            self.open_file(file_list_log_path)
+
+    def open_file(self, file_path):
+        """Open a file with the default system application."""
+        try:
+            if sys.platform.startswith('win'):
+                os.startfile(file_path)
+            elif sys.platform.startswith('darwin'):  # macOS
+                subprocess.call(('open', file_path))
+            else:  # Linux and other Unix-like
+                subprocess.call(('xdg-open', file_path))
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open file: {e}")
 
     def show_source_destination_warning(self):
         warning_window = tk.Toplevel(self.root)
