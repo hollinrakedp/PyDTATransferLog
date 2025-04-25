@@ -42,6 +42,7 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "rhel9" ]; then
             python3.11 -m pip install --upgrade pip
+            python3.11 -m pip install pyinstaller
             python3.11 -m pip install -r requirements.txt
           else
             python -m pip install --upgrade pip
@@ -59,7 +60,7 @@ jobs:
       - name: Install RHEL dependencies
         if: matrix.os == 'rhel9'
         run: |
-          sudo dnf install -y python3-tkinter
+          sudo dnf install -y python3.11-tkinter
 
       # Step 5: Build the executable
       - name: Build executable with PyInstaller
