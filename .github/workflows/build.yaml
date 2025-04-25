@@ -38,6 +38,7 @@ jobs:
 
       # Step 3: Install dependencies
       - name: Install dependencies
+        shell: bash
         run: |
           if [ "${{ matrix.os }}" = "rhel9" ]; then
             python3.11 -m pip install --upgrade pip
