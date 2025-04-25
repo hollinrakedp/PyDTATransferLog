@@ -13,12 +13,14 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, rhel9]
         include:
           - os: windows-latest
             artifact-name: dta-transfer-log-windows
           - os: ubuntu-latest
             artifact-name: dta-transfer-log-ubuntu
+          - os: rhel9
+            artifact-name: dta-transfer-log-rhel9
 
     runs-on: ${{ matrix.os }}
 
@@ -39,23 +41,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4: Install additional Linux dependencies (only for Ubuntu)
+      # Step 4a: Install Ubuntu dependencies
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk
-      
+
+      # Step 4b: Install RHEL dependencies
+      - name: Install RHEL dependencies
+        if: matrix.os == 'rhel9'
+        run: |
+          sudo dnf install -y python3-tkinter
+
       # Step 5: Build the executable
       - name: Build executable with PyInstaller
         run: |
           pyinstaller main.spec
 
+      # Step 6: Verify the dist directory
       - name: Verify dist directory
         shell: bash
         run: ls -la dist
 
-      # Step 6: Upload the executable as an artifact
+      # Step 7: Upload the executable as an artifact
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
