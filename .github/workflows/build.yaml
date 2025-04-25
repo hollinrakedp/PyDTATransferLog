@@ -31,6 +31,7 @@ jobs:
 
       # Step 2: Set up Python
       - name: Set up Python
+        if: matrix.os != 'rhel9'
         uses: actions/setup-python@v4
         with:
           python-version: 3.11.x
@@ -38,8 +39,13 @@ jobs:
       # Step 3: Install dependencies
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ "${{ matrix.os }}" = "rhel9" ]; then
+            python3.11 -m pip install --upgrade pip
+            python3.11 -m pip install -r requirements.txt
+          else
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          fi
 
       # Step 4a: Install Ubuntu dependencies
       - name: Install Linux dependencies
@@ -57,7 +63,11 @@ jobs:
       # Step 5: Build the executable
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller main.spec
+          if [ "${{ matrix.os }}" = "rhel9" ]; then
+            python3.11 -m pyinstaller main.spec
+          else
+            pyinstaller main.spec
+          fi
 
       # Step 6: Verify the dist directory
       - name: Verify dist directory
