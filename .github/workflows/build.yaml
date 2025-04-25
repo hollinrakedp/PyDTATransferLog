@@ -65,11 +65,7 @@ jobs:
       # Step 5: Build the executable
       - name: Build executable with PyInstaller
         run: |
-          if [ "${{ matrix.os }}" = "rhel9" ]; then
-            python3.11 -m pyinstaller main.spec
-          else
-            pyinstaller main.spec
-          fi
+          pyinstaller main.spec
 
       # Step 6: Verify the dist directory
       - name: Verify dist directory
