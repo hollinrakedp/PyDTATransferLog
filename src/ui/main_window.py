@@ -314,10 +314,32 @@ class FileTransferLoggerWindow(QMainWindow):
 
         # Initialize variables
         self.selected_files = []
+        self.normalized_paths = set()
         self.total_size = 0
 
         # Set up the UI
         self._setup_ui()
+
+        def _add_file(self, file_path):
+            """Add a file if it's not already in the selection"""
+            try:
+                normalized_path = self._normalize_path(file_path)
+                if normalized_path not in self.normalized_paths:
+                    try:
+                        file_size = os.path.getsize(file_path)
+                        self.total_size += file_size
+                    except Exception:
+                        # Handle files with access issues gracefully
+                        pass
+                    
+                    self.selected_files.append(file_path)
+                    self.normalized_paths.add(normalized_path)
+                    self.file_list.addItem(file_path)
+                    return True
+                return False
+            except Exception as e:
+                self.statusBar().showMessage(f"Error adding file {file_path}: {str(e)}")
+                return False
 
     def _setup_ui(self):
         # Create central widget and main layout
