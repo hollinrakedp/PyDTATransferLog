@@ -1,3 +1,2 @@
-pyinstaller
-tkcalendar
-ttkthemes
+pyside6>=6.5.0
+pyinstaller>=5.10.0

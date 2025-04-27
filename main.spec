@@ -1,13 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
-    ['main.py'],
+    ['src/main.py'],
     pathex=[],
     binaries=[],
     datas=[
         ('config.ini', '.'),
-        ('resources', 'resources'),
+        ('src/resources', 'resources'),
     ],
     hiddenimports=[],
     hookspath=[],
@@ -15,7 +14,6 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
 )
 pyz = PYZ(a.pure)
 
@@ -38,6 +36,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['resources\\DTATransferLog.ico'],
+    icon=['src/resources/icons/dtatransferlog.ico'],
     version='version.txt'
 )
