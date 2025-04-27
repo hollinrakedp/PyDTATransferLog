@@ -1,19 +1,20 @@
+import datetime
 import os
 import socket
-import datetime
-import csv
 import sys
 import subprocess
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+import csv
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QLineEdit, QComboBox, QPushButton,
-                               QListWidget, QCheckBox, QFileDialog, QMessageBox,
-                               QDateEdit, QProgressDialog, QStatusBar, QSizePolicy,
-                               QSpacerItem, QGroupBox)
-from PySide6.QtCore import Qt, QDate, QThread, Signal, QMimeData, QUrl
-from PySide6.QtGui import QIcon, QDragEnterEvent, QDropEvent, QPainter, QPen
-from utils.config_manager import ConfigManager
-from utils.file_utils import get_all_files, calculate_file_hash
-from models.log_model import TransferLog, FileInfo
+                               QDateEdit, QFileDialog, QMessageBox, QListWidget,
+                               QSizePolicy, QProgressDialog, QTreeWidget,
+                               QTreeWidgetItem, QCheckBox, QGroupBox, QSpacerItem)
+from PySide6.QtCore import Qt, QDate, QThread, Signal
+from PySide6.QtGui import (QIcon, QAction, QPainter, QPen,
+                           QDragEnterEvent, QDragMoveEvent, QDragLeaveEvent, QDropEvent)
+from utils.file_utils import calculate_file_hash, get_all_files
+from models.log_model import TransferLog
+from constants import TRANSFER_LOG_HEADERS
 
 
 class HashWorker(QThread):
@@ -52,12 +53,13 @@ class FileProcessingWorker(QThread):
     progress = Signal(int)
     finished = Signal(str)
 
-    def __init__(self, transfer_log, files, file_hashes, log_dir):
+    def __init__(self, transfer_log, files, file_hashes, base_log_dir, file_list_dir):
         super().__init__()
         self.transfer_log = transfer_log
         self.files = files
         self.file_hashes = file_hashes
-        self.log_dir = log_dir
+        self.base_log_dir = base_log_dir
+        self.file_list_dir = file_list_dir
         self.canceled = False
 
     def cancel(self):
@@ -75,7 +77,7 @@ class FileProcessingWorker(QThread):
             # Process the file list
             if not self.canceled:
                 file_list_path = self.transfer_log._save_file_list_with_progress(
-                    self.log_dir, self.files, self.file_hashes, self.progress,
+                    self.file_list_dir, self.files, self.file_hashes, self.progress,
                     lambda: self.canceled)
 
             # Delete the file list if canceled
@@ -84,13 +86,14 @@ class FileProcessingWorker(QThread):
                     os.remove(file_list_path)
                     file_list_path = ""
                 except Exception as e:
-                    print(f"Error deleting file list after cancellation: {str(e)}")
+                    print(
+                        f"Error deleting file list after cancellation: {str(e)}")
 
             # Create the annual transfer log
             if file_list_path and not self.canceled:
                 year = datetime.datetime.now().strftime("%Y")
                 csv_file = os.path.join(
-                    self.log_dir, f"TransferLog_{year}.log")
+                    self.base_log_dir, f"TransferLog_{year}.log")
 
                 # Format timestamp for CSV
                 ts = self.transfer_log.timestamp
@@ -119,11 +122,7 @@ class FileProcessingWorker(QThread):
 
                     # Write headers if file is new
                     if not file_exists:
-                        writer.writerow([
-                            "Timestamp", "Transfer Date", "Username", "Computer Name",
-                            "Media Type", "Media ID", "Transfer Type", "Source",
-                            "Destination", "File Count", "Total Size", "File Log"
-                        ])
+                        writer.writerow(TRANSFER_LOG_HEADERS)
 
                     writer.writerow(fields)
 
@@ -202,7 +201,7 @@ class DragDropFileListWidget(QListWidget):
                 files.append(path)
             elif os.path.isdir(path):
                 folders.append(path)
-        
+
         # Process all files and folders
         self._process_files_and_folders(files, folders)
 
@@ -213,10 +212,10 @@ class DragDropFileListWidget(QListWidget):
         for file in files:
             if self.main_window._add_file(file):
                 added_count += 1
-        
+
         # Process folders
         for folder in folders:
-            self.main_window.statusBar().showMessage(
+            self.main_window.app.set_status_message(
                 f"Scanning folder: {folder}")
 
             try:
@@ -225,12 +224,12 @@ class DragDropFileListWidget(QListWidget):
                     if self.main_window._add_file(file):
                         added_count += 1
             except Exception as e:
-                self.main_window.statusBar().showMessage(
+                self.main_window.app.set_status_message(
                     f"Error scanning folder: {str(e)}")
 
         # Update file count
         self.main_window._update_file_stats()
-        self.main_window.statusBar().showMessage(
+        self.main_window.app.set_status_message(
             f"Added {len(files)} files and processed {len(folders)} folders")
 
     def paintEvent(self, event):
@@ -267,21 +266,18 @@ class DragDropFileListWidget(QListWidget):
             painter.restore()
 
 
-class FileTransferLoggerWindow(QMainWindow):
-    def __init__(self, config):
-        super().__init__()
-        self.setWindowTitle("DTA File Transfer Log")
+class FileTransferLoggerTab(QWidget):
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+
+        # Store reference to parent app for status bar access
+        self.app = parent
 
         # Load configuration
         self.config = config
         self.media_types = self.config.get_list("UI", "MediaTypes")
-        self.network_list = self.config.get_list("UI", "NetworkList") 
+        self.network_list = self.config.get_list("UI", "NetworkList")
         self.transfer_types = self.config.get_transfer_types()
-
-        # Set up icon
-        icon_path = os.path.join("resources", "icons", "dtatransferlog.png")
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
 
         # Initialize variables
         self.selected_files = []
@@ -291,32 +287,9 @@ class FileTransferLoggerWindow(QMainWindow):
         # Set up the UI
         self._setup_ui()
 
-    def _add_file(self, file_path):
-        """Add a file if it's not already in the selection"""
-        try:
-            normalized_path = self._normalize_path(file_path)
-            if normalized_path not in self.normalized_paths:
-                try:
-                    file_size = os.path.getsize(file_path)
-                    self.total_size += file_size
-                except Exception:
-                    # Handle files with access issues gracefully
-                    pass
-                
-                self.selected_files.append(file_path)
-                self.normalized_paths.add(normalized_path)
-                self.file_list.addItem(file_path)
-                return True
-            return False
-        except Exception as e:
-            self.statusBar().showMessage(f"Error adding file {file_path}: {str(e)}")
-            return False
-
     def _setup_ui(self):
-        # Create central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
+        # Use main layout directly on the widget
+        main_layout = QHBoxLayout(self)
 
         # Create left panel (form inputs)
         left_panel = QWidget()
@@ -369,14 +342,15 @@ class FileTransferLoggerWindow(QMainWindow):
         # Media Type dropdown
         self.media_type_combo = self._add_combo_field(
             left_layout, "Media Type:", self.media_types)
-        
+
         # Media ID field
-        self.media_id_edit = self._add_line_field(left_layout, "Media ID:")
-        
+        media_id_prefixes = self.config.get_list("UI", "MediaID")
+        self.media_id_edit = self._add_editable_combo_field(left_layout, "Media ID:", media_id_prefixes)
+
         # Transfer Type dropdown
         self.transfer_type_combo = self._add_combo_field(
             left_layout, "Transfer Type:", list(self.transfer_types.keys()))
-        
+
         # Source dropdown
         self.source_combo = self._add_combo_field(
             left_layout, "Source:", self.network_list)
@@ -407,10 +381,10 @@ class FileTransferLoggerWindow(QMainWindow):
         left_layout.addSpacerItem(QSpacerItem(
             20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-        # Add the left panel to the main layout
+        # Add left panel to main layout
         main_layout.addWidget(left_panel)
 
-        # Create right panel (file list)
+        # Create right panel for file list
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
 
@@ -423,31 +397,39 @@ class FileTransferLoggerWindow(QMainWindow):
         self.log_folder_edit.setReadOnly(True)
         log_folder_layout.addWidget(self.log_folder_edit)
 
-        # Browse button
-        browse_btn = QPushButton("Browse")
-        browse_btn.clicked.connect(self.browse_log_folder)
-        log_folder_layout.addWidget(browse_btn)
-
         right_layout.addLayout(log_folder_layout)
 
         # Buttons for file/folder selection
         button_layout = QHBoxLayout()
 
-        select_files_btn = QPushButton("Select Files")
-        select_files_btn.clicked.connect(self.select_files)
-        button_layout.addWidget(select_files_btn)
-
-        select_folders_btn = QPushButton("Select Folders")
-        select_folders_btn.clicked.connect(self.select_folders)
-        button_layout.addWidget(select_folders_btn)
-
+        button_width = 120  # Width that accommodates "Remove Selected" with padding
+        
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_selected_files)
+        clear_btn.setFixedWidth(button_width)
+        clear_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         button_layout.addWidget(clear_btn)
 
         remove_selected_btn = QPushButton("Remove Selected")
         remove_selected_btn.clicked.connect(self.remove_selected_file)
+        remove_selected_btn.setFixedWidth(button_width)
+        remove_selected_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         button_layout.addWidget(remove_selected_btn)
+        
+        # Add stretch in the middle to separate the button groups
+        button_layout.addStretch()
+
+        select_files_btn = QPushButton("Select Files")
+        select_files_btn.clicked.connect(self.select_files)
+        select_files_btn.setFixedWidth(button_width)
+        select_files_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        button_layout.addWidget(select_files_btn)
+
+        select_folders_btn = QPushButton("Select Folders")
+        select_folders_btn.clicked.connect(self.select_folders)
+        select_folders_btn.setFixedWidth(button_width)
+        select_folders_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        button_layout.addWidget(select_folders_btn)
 
         right_layout.addLayout(button_layout)
 
@@ -458,28 +440,73 @@ class FileTransferLoggerWindow(QMainWindow):
             QListWidget.SelectionMode.ExtendedSelection)
         right_layout.addWidget(self.file_list)
 
-        # File count and Generate logs button
+        # File count and Log Transfer button
         bottom_layout = QHBoxLayout()
         self.file_count_label = QLabel("Files Selected: 0")
 
-        generate_logs_btn = QPushButton("Generate Logs")
-        generate_logs_btn.clicked.connect(self.save_logs)
+        log_transfer_btn = QPushButton("Log Transfer")
+        log_transfer_btn.clicked.connect(self.log_transfer)
 
         bottom_layout.addWidget(self.file_count_label)
         bottom_layout.addStretch()
-        bottom_layout.addWidget(generate_logs_btn)
+        bottom_layout.addWidget(log_transfer_btn)
         right_layout.addLayout(bottom_layout)
 
-        # Add the right panel to the main layout
+        # Add right panel to main layout
         main_layout.addWidget(right_panel)
 
-        # Set a reasonable initial size
-        self.resize(900, 600)
+    def get_menu_actions(self):
+        """Return actions for the menu when this tab is active"""
+        actions = []
 
-        # Status bar
-        self.statusBar().showMessage("Ready")
+        # Select Files
+        select_files_action = QAction("&Select Files...", self)
+        select_files_action.setShortcut("Ctrl+O")
+        select_files_action.triggered.connect(self.select_files)
+        actions.append(select_files_action)
 
-    # Helper methods
+        # Select Folder
+        select_folder_action = QAction("Select &Folder...", self)
+        select_folder_action.setShortcut("Ctrl+D")
+        select_folder_action.triggered.connect(self.select_folders)
+        actions.append(select_folder_action)
+
+        # Log Transfer
+        log_action = QAction("&Log Transfer...", self)
+        log_action.setShortcut("Ctrl+S")
+        log_action.triggered.connect(self.log_transfer)
+        actions.append(log_action)
+
+        return actions
+
+    def get_toolbar_actions(self):
+        """Return actions for the toolbar when this tab is active"""
+        actions = []
+
+        return actions
+
+    def _add_file(self, file_path):
+        """Add a file if it's not already in the selection"""
+        try:
+            normalized_path = self._normalize_path(file_path)
+            if normalized_path not in self.normalized_paths:
+                try:
+                    file_size = os.path.getsize(file_path)
+                    self.total_size += file_size
+                except Exception:
+                    # Handle files with access issues gracefully
+                    pass
+
+                self.selected_files.append(file_path)
+                self.normalized_paths.add(normalized_path)
+                self.file_list.addItem(file_path)
+                return True
+            return False
+        except Exception as e:
+            self.app.set_status_message(
+                f"Error adding file {file_path}: {str(e)}")
+            return False
+
     def _add_combo_field(self, layout, label_text, options):
         field_layout = QHBoxLayout()
         label = QLabel(label_text)
@@ -505,6 +532,26 @@ class FileTransferLoggerWindow(QMainWindow):
         layout.addLayout(field_layout)
         return line_edit
 
+    def _add_editable_combo_field(self, layout, label_text, options):
+        """Add an editable combo box field with label"""
+        field_layout = QHBoxLayout()
+        label = QLabel(label_text)
+        label.setFixedWidth(self.label_width)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        field_layout.addWidget(label)
+        
+        combo = QComboBox()
+        combo.setEditable(True)
+        combo.addItem("")
+        
+        # Add items to the dropdown
+        if options:
+            combo.addItems(options)
+        
+        field_layout.addWidget(combo)
+        layout.addLayout(field_layout)
+        return combo
+
     def _normalize_path(self, path):
         """Normalize a path for consistent comparisons"""
         # Convert to absolute path and normalize slashes
@@ -521,7 +568,7 @@ class FileTransferLoggerWindow(QMainWindow):
                 else:  # Linux and other Unix-like
                     subprocess.call(['xdg-open', file_path])
             except Exception as e:
-                self.statusBar().showMessage(f"Error opening file: {str(e)}")
+                self.app.set_status_message(f"Error opening file: {str(e)}")
 
     def _format_size(self, size_bytes):
         """Format file size in human-readable format"""
@@ -533,23 +580,16 @@ class FileTransferLoggerWindow(QMainWindow):
             return f"{size_bytes/(1024*1024):.2f} MB"
         else:
             return f"{size_bytes/(1024*1024*1024):.2f} GB"
-    
+
     def _update_file_stats(self):
         """Update the file count and size display"""
         size_str = self._format_size(self.total_size)
-        self.file_count_label.setText(f"Files: {len(self.selected_files)} | Size: {size_str}")
+        self.file_count_label.setText(
+            f"Files: {len(self.selected_files)} | Size: {size_str}")
 
     # Event handlers
-    def browse_log_folder(self):
-        folder = QFileDialog.getExistingDirectory(
-            self, "Select Log Output Folder", self.log_folder_edit.text())
-        if folder:
-            self.log_folder_edit.setText(folder)
-            self.config.set("Logging", "OutputFolder", folder)
-            self.config.save()
-
     def select_files(self):
-        self.statusBar().showMessage("Selecting files...")
+        self.app.set_status_message("Selecting files...")
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
 
         added_count = 0
@@ -558,12 +598,12 @@ class FileTransferLoggerWindow(QMainWindow):
                 added_count += 1
 
         self._update_file_stats()
-        self.statusBar().showMessage(f"Added {added_count} files")
+        self.app.set_status_message(f"Added {added_count} files")
 
     def select_folders(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder:
-            self.statusBar().showMessage(f"Scanning folder: {folder}")
+            self.app.set_status_message(f"Scanning folder: {folder}")
 
             # Show progress dialog while scanning
             progress = QProgressDialog(
@@ -580,7 +620,8 @@ class FileTransferLoggerWindow(QMainWindow):
                         added_count += 1
 
                 self._update_file_stats()
-                self.statusBar().showMessage(f"Added {added_count} files from folder")
+                self.app.set_status_message(
+                    f"Added {added_count} files from folder")
             finally:
                 progress.close()
 
@@ -590,7 +631,7 @@ class FileTransferLoggerWindow(QMainWindow):
         self.file_list.clear()
         self.total_size = 0
         self._update_file_stats()
-        self.statusBar().showMessage("Cleared file list")
+        self.app.set_status_message("Cleared file list")
 
     def remove_selected_file(self):
         selected_items = self.file_list.selectedItems()
@@ -610,13 +651,13 @@ class FileTransferLoggerWindow(QMainWindow):
                 self.file_list.takeItem(row)
 
         self._update_file_stats()
-        self.statusBar().showMessage(f"Removed {len(selected_items)} items")
+        self.app.set_status_message(f"Removed {len(selected_items)} items")
 
-    def save_logs(self):
+    def log_transfer(self):
         # Collect validation errors
         validation_errors = []
 
-        if not self.media_id_edit.text():
+        if not self.media_id_edit.currentText():
             validation_errors.append("Please enter Media ID")
 
         if self.media_type_combo.currentIndex() == 0:
@@ -665,15 +706,18 @@ class FileTransferLoggerWindow(QMainWindow):
         username = self.username_edit.text()
         computer_name = self.computer_edit.text()
         media_type = self.media_type_combo.currentText()
-        media_id = self.media_id_edit.text()
+        media_id = self.media_id_edit.currentText()
 
         transfer_type_name = self.transfer_type_combo.currentText()
         transfer_type = self.transfer_types.get(transfer_type_name, "")
 
-        # Create log directory
-        log_dir = os.path.join(self.log_folder_edit.text(),
-                               datetime.datetime.now().strftime("%Y"))
-        os.makedirs(log_dir, exist_ok=True)
+        # Get the base log directory (OutputFolder) for the transfer log
+        base_log_dir = self.log_folder_edit.text()
+        
+        # Create year subfolder for file list logs
+        year = datetime.datetime.now().strftime("%Y")
+        file_list_dir = os.path.join(base_log_dir, year)
+        os.makedirs(file_list_dir, exist_ok=True)
 
         # Create transfer log
         transfer_log = TransferLog(
@@ -705,15 +749,16 @@ class FileTransferLoggerWindow(QMainWindow):
             self.hash_worker = HashWorker(self.selected_files)
             self.hash_worker.progress.connect(self.progress_dialog.setValue)
             self.hash_worker.finished.connect(
-                lambda hashes: self.start_file_processing(transfer_log, hashes, log_dir) 
+                lambda hashes: self.start_file_processing(
+                    transfer_log, hashes, base_log_dir, file_list_dir)
                 if hashes else None
             )
             self.hash_worker.start()
         else:
             # Skip checksums and proceed directly to file processing
-            self.start_file_processing(transfer_log, {}, log_dir)
+            self.start_file_processing(transfer_log, {}, base_log_dir, file_list_dir)
 
-    def start_file_processing(self, transfer_log, hashes, log_dir):
+    def start_file_processing(self, transfer_log, hashes, base_log_dir, file_list_dir):
         if hasattr(self, 'progress_dialog'):
             self.progress_dialog.close()
 
@@ -729,7 +774,7 @@ class FileTransferLoggerWindow(QMainWindow):
 
         # Create worker thread for file processing
         self.file_worker = FileProcessingWorker(
-            transfer_log, self.selected_files, hashes, log_dir)
+            transfer_log, self.selected_files, hashes, base_log_dir, file_list_dir)
         self.file_worker.progress.connect(self.file_progress_dialog.setValue)
         self.file_worker.finished.connect(lambda file_path: self.complete_log_save(
             transfer_log, file_path))
@@ -742,7 +787,7 @@ class FileTransferLoggerWindow(QMainWindow):
 
         # Check if this was a cancellation
         if not file_path and hasattr(self, 'file_worker') and self.file_worker.canceled:
-            self.statusBar().showMessage("Log generation cancelled by user")
+            self.app.set_status_message("Log generation cancelled by user")
             return
 
         if file_path:
@@ -755,7 +800,7 @@ class FileTransferLoggerWindow(QMainWindow):
             )
 
             # Success status bar
-            self.statusBar().showMessage(
+            self.app.set_status_message(
                 f"Logs generated successfully - {len(self.selected_files)} files processed")
 
             # Open log files if requested
@@ -764,19 +809,18 @@ class FileTransferLoggerWindow(QMainWindow):
 
             if self.open_transfer_log_check.isChecked():
                 year = datetime.datetime.now().strftime("%Y")
-                yearly_log = os.path.join(os.path.dirname(
-                    file_path), f"TransferLog_{year}.log")
+                yearly_log = os.path.join(self.log_folder_edit.text(), f"TransferLog_{year}.log")
                 self.open_file(yearly_log)
         else:
             QMessageBox.critical(self, "Error", "Failed to save log file")
-            self.statusBar().showMessage("Error: Failed to save log file")
+            self.app.set_status_message("Error: Failed to save log file")
 
     def cancel_hash_operation(self):
         """Cancel the hash calculation operation and entire logging process"""
         if hasattr(self, 'hash_worker'):
             self.hash_worker.cancel()
-            self.statusBar().showMessage("Log generation canceled by user")
-            
+            self.app.set_status_message("Log generation canceled by user")
+
         # Close the progress dialog if it's open
         if hasattr(self, 'progress_dialog'):
             self.progress_dialog.close()
@@ -785,8 +829,8 @@ class FileTransferLoggerWindow(QMainWindow):
         """Cancel the file processing operation"""
         if hasattr(self, 'file_worker'):
             self.file_worker.cancel()
-            self.statusBar().showMessage("File processing canceled by user")
-            
+            self.app.set_status_message("File processing canceled by user")
+
         # Close the progress dialog if it's open
         if hasattr(self, 'file_progress_dialog'):
             self.file_progress_dialog.close()

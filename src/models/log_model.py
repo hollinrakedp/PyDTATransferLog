@@ -4,6 +4,7 @@ import datetime
 import io
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Union, BinaryIO
+from constants import FILE_LIST_HEADERS
 
 
 @dataclass
@@ -352,8 +353,7 @@ class TransferLog:
                 writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
                 # Write header
-                writer.writerow(
-                    ["Level", "Container", "FullName", "Size", "SHA256"])
+                writer.writerow(FILE_LIST_HEADERS)
 
                 # Process each file with progress updates
                 total_files = len(files)

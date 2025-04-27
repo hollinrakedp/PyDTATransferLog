@@ -3,8 +3,7 @@ import os
 import argparse
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QDir
-from ui.main_window import FileTransferLoggerWindow
-from ui.review_window import TransferLogReviewerWindow
+from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
 
 def main():
@@ -36,10 +35,14 @@ def main():
     parser.add_argument("-y", "--year", help="Year to review")
     args, _ = parser.parse_known_args()
     
+    # Create the main application window with tabs
+    window = DTATransferLogApp(config)
+    
+    # If review mode specified, switch to review tab
     if args.review:
-        window = TransferLogReviewerWindow(year=args.year)
-    else:
-        window = FileTransferLoggerWindow(config)
+        window.tab_widget.setCurrentIndex(1)  # Switch to Review tab
+        if args.year and hasattr(window.review_tab, 'set_year'):
+            window.review_tab.set_year(args.year)
     
     window.show()
     sys.exit(app.exec())

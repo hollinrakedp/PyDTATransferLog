@@ -1,28 +1,65 @@
 import os
 import configparser
 
+class CommentedConfigParser(configparser.ConfigParser):
+    """ConfigParser that preserves comments"""
+    
+    def __init__(self):
+        super().__init__()
+        self.comments = {
+            "UI": {
+                "_section": "UI section contains user interface settings",
+                "MediaTypes": "; Specifies the list of available media types that can be selected in the application.\n; These are the types of storage media used for file transfers.",
+                "TransferTypes": "; Specifies the available transfer types and their abbreviations.\n; Format: <Full Name>:<Abbreviation>\n; Example: \"Low to High\" is abbreviated as \"L2H\".",
+                "NetworkList": "; Specifies the list of available networks for the source and destination.\n; These represent the networks involved in the file transfer.\n; Example: IS001, System 99",
+                "MediaID": "",
+                "Theme": ""
+            },
+            "Logging": {
+                "_section": "Logging section contains settings for log file generation",
+                "OutputFolder": "; Specifies the default folder where log files will be saved.\n; This path can be customized to store logs in a specific directory.\n; You can use a relative path (e.g., ./logs) or an absolute path (e.g., C:\\logs).\n; Ensure that the specified folder exists before running the application.",
+                "FileDelimiter": "; - Delimiter: The character used to separate parts of the log file name.",
+                "TransferLogPrefix": "; The base name for the transfer log file.",
+                "FileListPrefix": "; The base name for the file list log file."
+            }
+        }
+    
+    def write(self, fp):
+        """Write the configuration with comments"""
+        for section in self.sections():
+            fp.write(f"[{section}]\n")
+            if section in self.comments and "_section" in self.comments[section]:
+                fp.write(f"{self.comments[section]['_section']}\n")
+            
+            for key, value in self[section].items():
+                if section in self.comments and key in self.comments[section]:
+                    fp.write(f"{self.comments[section][key]}\n")
+                fp.write(f"{key} = {value}\n")
+            fp.write("\n")
+
 class ConfigManager:
     """Class for managing application configuration"""
-    
+
     DEFAULT_CONFIG = {
-        "Paths": {
-            "LogOutputFolder": "./logs",
+        "UI": {
+            "MediaTypes": "Apricorn, Blu-ray, CD, DVD, Flash, HDD, microSD, SD, SSD",
+            "TransferTypes": "Low to High:L2H, High to High:H2H, High to Low:H2L",
+            "NetworkList": "Intranet, Customer, IS001, System 99",
+            "MediaID": "",
+            "Theme": "arc"
         },
-        "MediaTypes": {
-            "Options": "HDD,SSD,USB Drive,DVD,CD,Network Share,Cloud Storage,FTP,Email,Other"
-        },
-        "NetworkList": {
-            "Options": "NETWORK1,NETWORK2,NETWORK3,NETWORK4"
-        },
-        "TransferTypes": {
-            "Options": "Archive:ARC,Export:EXP,Import:IMP,Transfer:XFR"
+        "Logging": {
+            "OutputFolder": "./logs",
+            "FileDelimiter": "_",
+            "TransferLogPrefix": "DTATransferLog",
+            "FileListPrefix": "DTAFileList"
         }
     }
     
     def __init__(self, config_path):
         """Initialize the config manager"""
         self.config_path = config_path
-        self.config = configparser.ConfigParser()
+        self.config = CommentedConfigParser()
         
         # Load config or create if doesn't exist
         if os.path.exists(config_path):
