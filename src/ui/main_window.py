@@ -319,21 +319,6 @@ class FileTransferLoggerWindow(QMainWindow):
         # Set up the UI
         self._setup_ui()
 
-    def _get_config_list(self, option):
-        """Get a list of items from the UI section of the config"""
-        items = self.config.get("UI", option, fallback="")
-        return [item.strip() for item in items.split(",") if item.strip()]
-
-    def _get_transfer_types(self):
-        """Parse transfer types from the UI section"""
-        items = self.config.get("UI", "TransferTypes", fallback="")
-        mapping = {}
-        for pair in items.split(","):
-            if ":" in pair:
-                name, abbr = pair.split(":", 1)
-                mapping[name.strip()] = abbr.strip()
-        return mapping
-
     def _setup_ui(self):
         # Create central widget and main layout
         central_widget = QWidget()
