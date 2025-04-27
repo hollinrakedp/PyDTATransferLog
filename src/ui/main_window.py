@@ -187,38 +187,8 @@ class DragDropFileListWidget(QListWidget):
                 elif os.path.isdir(file_path):
                     folders.append(file_path)
 
-        # Add files to the selection
-        for file in files:
-            normalized_path = self.main_window._normalize_path(file)
-            if normalized_path not in [self.main_window._normalize_path(f) for f in self.main_window.selected_files]:
-                file_size = os.path.getsize(file)
-                self.main_window.total_size += file_size
-                self.main_window.selected_files.append(file)
-                self.addItem(file)
-        
-        # Update display with file count and total size
-        self.main_window._update_file_stats()
-
-        # Process folders
-        for folder in folders:
-            self.main_window.statusBar().showMessage(
-                f"Scanning folder: {folder}")
-
-            try:
-                folder_files = get_all_files(folder)
-                for file in folder_files:
-                    normalized_path = self.main_window._normalize_path(file)
-                    if normalized_path not in [self.main_window._normalize_path(f) for f in self.main_window.selected_files]:
-                        self.main_window.selected_files.append(file)
-                        self.addItem(file)
-            except Exception as e:
-                self.main_window.statusBar().showMessage(
-                    f"Error scanning folder: {str(e)}")
-
-        # Update file count
-        self.main_window._update_file_stats()
-        self.main_window.statusBar().showMessage(
-            f"Added {len(files)} files and processed {len(folders)} folders")
+        # Process all files and folders
+        self._process_files_and_folders(files, folders)
 
     def process_dropped_text(self, text):
         """Process dropped text as potential file paths"""
@@ -232,27 +202,28 @@ class DragDropFileListWidget(QListWidget):
                 files.append(path)
             elif os.path.isdir(path):
                 folders.append(path)
+        
+        # Process all files and folders
+        self._process_files_and_folders(files, folders)
 
-        # Add files to the selection
+    def _process_files_and_folders(self, files, folders):
+        """Process lists of files and folders"""
+        # Add individual files
+        added_count = 0
         for file in files:
-            normalized_path = self.main_window._normalize_path(file)
-            if normalized_path not in [self.main_window._normalize_path(f) for f in self.main_window.selected_files]:
-                try:
-                    self.main_window.total_size += os.path.getsize(file)
-                except:
-                    pass
-                self.main_window.selected_files.append(file)
-                self.addItem(file)
-
+            if self.main_window._add_file(file):
+                added_count += 1
+        
         # Process folders
         for folder in folders:
+            self.main_window.statusBar().showMessage(
+                f"Scanning folder: {folder}")
+
             try:
                 folder_files = get_all_files(folder)
                 for file in folder_files:
-                    normalized_path = self.main_window._normalize_path(file)
-                    if normalized_path not in [self.main_window._normalize_path(f) for f in self.main_window.selected_files]:
-                        self.main_window.selected_files.append(file)
-                        self.addItem(file)
+                    if self.main_window._add_file(file):
+                        added_count += 1
             except Exception as e:
                 self.main_window.statusBar().showMessage(
                     f"Error scanning folder: {str(e)}")
@@ -320,26 +291,26 @@ class FileTransferLoggerWindow(QMainWindow):
         # Set up the UI
         self._setup_ui()
 
-        def _add_file(self, file_path):
-            """Add a file if it's not already in the selection"""
-            try:
-                normalized_path = self._normalize_path(file_path)
-                if normalized_path not in self.normalized_paths:
-                    try:
-                        file_size = os.path.getsize(file_path)
-                        self.total_size += file_size
-                    except Exception:
-                        # Handle files with access issues gracefully
-                        pass
-                    
-                    self.selected_files.append(file_path)
-                    self.normalized_paths.add(normalized_path)
-                    self.file_list.addItem(file_path)
-                    return True
-                return False
-            except Exception as e:
-                self.statusBar().showMessage(f"Error adding file {file_path}: {str(e)}")
-                return False
+    def _add_file(self, file_path):
+        """Add a file if it's not already in the selection"""
+        try:
+            normalized_path = self._normalize_path(file_path)
+            if normalized_path not in self.normalized_paths:
+                try:
+                    file_size = os.path.getsize(file_path)
+                    self.total_size += file_size
+                except Exception:
+                    # Handle files with access issues gracefully
+                    pass
+                
+                self.selected_files.append(file_path)
+                self.normalized_paths.add(normalized_path)
+                self.file_list.addItem(file_path)
+                return True
+            return False
+        except Exception as e:
+            self.statusBar().showMessage(f"Error adding file {file_path}: {str(e)}")
+            return False
 
     def _setup_ui(self):
         # Create central widget and main layout
@@ -583,15 +554,7 @@ class FileTransferLoggerWindow(QMainWindow):
 
         added_count = 0
         for file in files:
-            normalized_path = self._normalize_path(file)
-            # Check if normalized path is already in selected files
-            if normalized_path not in [self._normalize_path(f) for f in self.selected_files]:
-                try:
-                    self.total_size += os.path.getsize(file)
-                except:
-                    pass
-                self.selected_files.append(file)
-                self.file_list.addItem(file)
+            if self._add_file(file):
                 added_count += 1
 
         self._update_file_stats()
@@ -613,24 +576,17 @@ class FileTransferLoggerWindow(QMainWindow):
                 files = get_all_files(folder)
                 added_count = 0
                 for file in files:
-                    normalized_path = self._normalize_path(file)
-                    if normalized_path not in [self._normalize_path(f) for f in self.selected_files]:
-                        try:
-                            self.total_size += os.path.getsize(file)
-                        except:
-                            pass
-                        self.selected_files.append(file)
-                        self.file_list.addItem(file)
+                    if self._add_file(file):
                         added_count += 1
 
                 self._update_file_stats()
-                self.statusBar().showMessage(
-                    f"Added {added_count} files from folder")
+                self.statusBar().showMessage(f"Added {added_count} files from folder")
             finally:
                 progress.close()
 
     def clear_selected_files(self):
         self.selected_files.clear()
+        self.normalized_paths.clear()
         self.file_list.clear()
         self.total_size = 0
         self._update_file_stats()
@@ -649,6 +605,7 @@ class FileTransferLoggerWindow(QMainWindow):
                 except:
                     pass
                 self.selected_files.remove(file_path)
+                self.normalized_paths.remove(self._normalize_path(file_path))
                 row = self.file_list.row(item)
                 self.file_list.takeItem(row)
 
