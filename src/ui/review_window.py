@@ -4,8 +4,8 @@ import csv
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QComboBox, QPushButton, QSplitter, QTreeWidget,
                                QTreeWidgetItem, QLineEdit, QHeaderView,
-                               QFileDialog, QMessageBox)
-from PySide6.QtCore import Qt, QSize
+                               QFileDialog, QMessageBox, QDateEdit)
+from PySide6.QtCore import Qt, QSize, QDate
 from PySide6.QtGui import QAction, QIcon
 from constants import TRANSFER_LOG_HEADERS
 
@@ -22,22 +22,25 @@ class TransferLogReviewerTab(QWidget):
         self.log_dir = self.config.get(
             "Logging", "OutputFolder", fallback="./logs")
 
-        # Set initial year
-        self.selected_year = year or datetime.datetime.now().strftime("%Y")
+        # Initialize pagination variables
+        self.current_page = 1
+        self.entries_per_page = 10
+        self.all_log_entries = []
+        self.filtered_entries = []
+        self.total_pages = 1
 
         # Initialize filtering variables
         self.search_text = ""
         self.filter_field = None
         self.filter_value = None
+        self.start_date_filter = None
+        self.end_date_filter = None
 
         # Set up UI
         self._setup_ui()
 
-        # Load available years
-        self.load_available_years()
-
-        # Load log file
-        self.load_log_file()
+        # Load log data
+        self.load_log_data()
 
     def _setup_ui(self):
         # Main layout
@@ -46,11 +49,23 @@ class TransferLogReviewerTab(QWidget):
         # Filter controls
         filter_layout = QHBoxLayout()
         
-        # Year selection
-        filter_layout.addWidget(QLabel("Year:"))
-        self.year_combo = QComboBox()
-        self.year_combo.currentIndexChanged.connect(self.on_year_changed)
-        filter_layout.addWidget(self.year_combo)
+        # Date range filtering
+        filter_layout.addWidget(QLabel("From:"))
+        self.start_date = QDateEdit(QDate.currentDate().addMonths(-1))  # Default to 1 month ago
+        self.start_date.setCalendarPopup(True)
+        self.start_date.setDisplayFormat("MM/dd/yyyy")
+        filter_layout.addWidget(self.start_date)
+        
+        filter_layout.addWidget(QLabel("To:"))
+        self.end_date = QDateEdit(QDate.currentDate())  # Default to today
+        self.end_date.setCalendarPopup(True)
+        self.end_date.setDisplayFormat("MM/dd/yyyy")
+        filter_layout.addWidget(self.end_date)
+        
+        # Apply date filter button
+        self.apply_date_filter_btn = QPushButton("Apply Date Filter")
+        self.apply_date_filter_btn.clicked.connect(self.apply_date_filter)
+        filter_layout.addWidget(self.apply_date_filter_btn)
         
         # Field filter
         filter_layout.addWidget(QLabel("Filter by:"))
@@ -58,6 +73,7 @@ class TransferLogReviewerTab(QWidget):
         self.field_filter_combo.addItem("-- Select Field --")
         self.field_filter_combo.addItems(TRANSFER_LOG_HEADERS)
         filter_layout.addWidget(self.field_filter_combo)
+        self.field_filter_combo.currentIndexChanged.connect(self.on_filter_field_changed)
         
         # Value filter
         self.value_filter_combo = QComboBox()
@@ -89,23 +105,43 @@ class TransferLogReviewerTab(QWidget):
         filter_layout.addStretch()
         main_layout.addLayout(filter_layout)
         
-        # Add refresh and export buttons
-        buttons_layout = QHBoxLayout()
+        # Pagination controls
+        pagination_layout = QHBoxLayout()
+        pagination_layout.addWidget(QLabel("Page:"))
+        self.page_combo = QComboBox()
+        pagination_layout.addWidget(self.page_combo)
+        
+        self.entries_per_page_combo = QComboBox()
+        self.entries_per_page_combo.addItems(["5", "10", "25", "50", "All"])
+        self.entries_per_page_combo.setCurrentText("10")
+        pagination_layout.addWidget(QLabel("Entries per page:"))
+        pagination_layout.addWidget(self.entries_per_page_combo)
+        self.entries_per_page_combo.currentTextChanged.connect(self.on_page_size_changed)
+        
+        # Previous/Next page buttons
+        self.prev_page_btn = QPushButton("Previous")
+        self.prev_page_btn.clicked.connect(self.prev_page)
+        pagination_layout.addWidget(self.prev_page_btn)
+        
+        self.next_page_btn = QPushButton("Next")
+        self.next_page_btn.clicked.connect(self.next_page)
+        pagination_layout.addWidget(self.next_page_btn)
+        
+        pagination_layout.addStretch()
         
         # Refresh button
         refresh_btn = QPushButton("Refresh Log Data")
         refresh_btn.setIcon(QIcon("resources/icons/refresh.png"))
-        refresh_btn.clicked.connect(self.load_log_file)
-        buttons_layout.addWidget(refresh_btn)
+        refresh_btn.clicked.connect(self.load_log_data)
+        pagination_layout.addWidget(refresh_btn)
         
         # Export button
         export_btn = QPushButton("Export Current View")
         export_btn.setIcon(QIcon("resources/icons/export.png"))
         export_btn.clicked.connect(self.export_current_view)
-        buttons_layout.addWidget(export_btn)
+        pagination_layout.addWidget(export_btn)
         
-        buttons_layout.addStretch()
-        main_layout.addLayout(buttons_layout)
+        main_layout.addLayout(pagination_layout)
         
         # Create splitter for top/bottom panes
         splitter = QSplitter(Qt.Vertical)
@@ -148,6 +184,9 @@ class TransferLogReviewerTab(QWidget):
         status_layout.addWidget(self.tab_status_label)
         main_layout.addLayout(status_layout)
 
+        # Connect field filter change
+        self.field_filter_combo.currentIndexChanged.connect(self.on_filter_field_changed)
+
     def get_menu_actions(self):
         """Return actions for the menu when this tab is active"""
         actions = []
@@ -155,8 +194,7 @@ class TransferLogReviewerTab(QWidget):
         # Refresh action
         refresh_action = QAction("&Refresh Log Data", self)
         refresh_action.setShortcut("F5")
-        refresh_action.triggered.connect(self.load_log_file)
-        actions.append(refresh_action)
+        refresh_action.triggered.connect(self.load_log_data)
 
         # Export action
         export_action = QAction("&Export Current View...", self)
@@ -239,10 +277,6 @@ class TransferLogReviewerTab(QWidget):
                 self.app.set_status_message(
                     f"Error loading available years: {str(e)}")
 
-    def on_year_changed(self):
-        """Handle year selection change"""
-        self.selected_year = self.year_combo.currentText()
-        self.load_log_file()
 
     def _adjust_column_sizes(self, tree, fullname_column_index=-1):
         """Auto-size columns to fit content once, then make user-resizable"""
@@ -263,57 +297,47 @@ class TransferLogReviewerTab(QWidget):
             else:
                 tree.setColumnWidth(i, width)
 
-    def load_log_file(self):
-        """Load the log file for the selected year"""
+    def load_log_data(self):
+        """Load all log files from the log directory"""
+        self.app.set_status_message("Loading log data...")
+
+        # Clear current data
         self.log_tree.clear()
         self.details_tree.clear()
+        self.all_log_entries = []
 
-        # Temporarily disable sorting for better performance during loading
+        # Temporarily disable sorting for better performance
         self.log_tree.setSortingEnabled(False)
 
-        log_file = os.path.join(self.log_dir, f"TransferLog_{self.selected_year}.log")
-
-        if not os.path.exists(log_file):
-            self.app.set_status_message(
-                f"Log file for {self.selected_year} not found")
+        if not os.path.exists(self.log_dir):
+            self.app.set_status_message(f"Log directory {self.log_dir} not found")
+            return
+        
+        # Find all log files in the directory
+        log_files = []
+        for file in os.listdir(self.log_dir):
+            if file.endswith('.log'):
+                log_files.append(os.path.join(self.log_dir, file))
+        
+        if not log_files:
+            self.app.set_status_message("No log files found")
             return
 
-        try:
-            with open(log_file, 'r', newline='') as f:
-                reader = csv.reader(f)
-                headers = next(reader)  # Skip header row
-
-                # Read all rows
-                log_entries = list(reader)
-
-                # Apply filters if any
-                filtered_entries = self.filter_entries(log_entries)
-
-                # Add entries to tree
-                for entry in filtered_entries:
-                    item = QTreeWidgetItem(self.log_tree)
-                    for i, value in enumerate(entry):
-                        # Format total size column (index 10)
-                        if i == 10:  # Total Size column
-                            formatted_size = format_size(value)
-                            item.setText(i, formatted_size)
-                            # Store original size for sorting
-                            item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
-                        else:
-                            item.setText(i, value)
-
-                # Update status
-                self.app.set_status_message(
-                    f"Loaded {len(filtered_entries)} log entries for {self.selected_year}")
-
-        except Exception as e:
-            self.app.set_status_message(f"Error loading log file: {str(e)}")
+        # Process all log files and collect entries
+        for log_file in log_files:
+            try:
+                with open(log_file, 'r', newline='') as f:
+                    reader = csv.reader(f)
+                    headers = next(reader)  # Skip header row
+                    self.all_log_entries.extend(list(reader))
+            except Exception as e:
+                self.app.set_status_message(f"Error loading {os.path.basename(log_file)}: {str(e)}")
+        
+        # Apply filters
+        self.apply_filters()
         
         # Re-enable sorting after loading
         self.log_tree.setSortingEnabled(True)
-        
-        # Auto-size columns for initial display
-        self._adjust_column_sizes(self.log_tree)
 
     def on_log_entry_selected(self):
         """Handle log entry selection"""
@@ -381,33 +405,35 @@ class TransferLogReviewerTab(QWidget):
 
     def apply_filter(self):
         """Apply filter to log entries"""
-        field_index = self.field_filter_combo.currentIndex() - \
-            1  # -1 because of "Select Field"
+        field_index = self.field_filter_combo.currentIndex() - 1
         if field_index < 0:
             return
 
         self.filter_field = field_index
         self.filter_value = self.value_filter_combo.currentText()
 
-        # Reload log with filter applied
-        self.load_log_file()
+        field_name = TRANSFER_LOG_HEADERS[field_index]
+        self.app.set_status_message(f"Filtering by {field_name}: {self.filter_value}")
+
+        # Apply the filter
+        self.apply_filters()
 
     def clear_filter(self):
         """Clear applied filters"""
         self.filter_field = None
         self.filter_value = None
         self.field_filter_combo.setCurrentIndex(0)
-        self.value_filter_combo.setCurrentText("")
+        self.value_filter_combo.clear()
 
         # Reload log without filter
-        self.load_log_file()
+        self.load_log_data()
 
     def apply_search(self):
         """Apply search to log entries"""
         self.search_text = self.search_edit.text()
 
         # Reload log with search applied
-        self.load_log_file()
+        self.load_log_data()
 
     def filter_entries(self, entries):
         """Filter log entries based on filter and search"""
@@ -436,24 +462,17 @@ class TransferLogReviewerTab(QWidget):
             return
 
         try:
-            log_file = os.path.join(self.log_dir, f"TransferLog_{self.selected_year}.log")
-
-            with open(log_file, 'r', newline='') as f:
-                reader = csv.reader(f)
-                headers = next(reader)  # Get headers
-                log_entries = list(reader)  # Read all data
-
-            # Apply current filters
-            filtered_entries = self.filter_entries(log_entries)
+            # Get column headers from the log tree
+            headers = [self.log_tree.headerItem().text(i) for i in range(self.log_tree.columnCount())]
 
             # Write filtered data to export file
             with open(file_name, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(headers)  # Write headers
-                writer.writerows(filtered_entries)  # Write filtered data
+                writer.writerows(self.filtered_entries)  # Write filtered data
 
             self.app.set_status_message(
-                f"Exported {len(filtered_entries)} entries to {file_name}")
+                f"Exported {len(self.filtered_entries)} entries to {file_name}")
 
         except Exception as e:
             self.app.set_status_message(f"Error exporting data: {str(e)}")
@@ -464,8 +483,7 @@ class TransferLogReviewerTab(QWidget):
         if new_log_dir != self.log_dir:
             self.log_dir = new_log_dir
             self.app.set_status_message(f"Log directory updated to {self.log_dir}")
-            self.load_available_years()
-            self.load_log_file()
+            self.load_log_data()
         return self.log_dir
 
     def reload_configuration(self):
@@ -481,9 +499,8 @@ class TransferLogReviewerTab(QWidget):
                     self.log_dir = new_log_dir
                     self.app.set_status_message(f"Log directory updated to {self.log_dir}")
                     
-                    # Reload years list and log data with new directory
-                    self.load_available_years()
-                    self.load_log_file()
+                    # Reload log data with new directory
+                    self.load_log_data()
                 
                 # Show success message
                 QMessageBox.information(self, "Configuration Reloaded", 
@@ -501,6 +518,173 @@ class TransferLogReviewerTab(QWidget):
             QMessageBox.critical(self, "Error", 
                                 f"Error reloading configuration: {str(e)}")
 
+    def apply_date_filter(self):
+        """Apply date range filter"""
+        # Get date values
+        self.start_date_filter = self.start_date.date()
+        self.end_date_filter = self.end_date.date()
+        
+        # Apply all filters again
+        self.apply_filters()
+
+    def apply_filters(self):
+        """Apply all filters (date range, field/value, search) to the log entries"""
+        filtered = self.all_log_entries
+        
+        # Apply date range filter
+        if self.start_date_filter and self.end_date_filter:
+            # Transfer dates are typically in column 1 (index 1) in format MM/DD/YYYY
+            filtered = [
+                e for e in filtered if self._is_date_in_range(e[1], 
+                                                             self.start_date_filter, 
+                                                             self.end_date_filter)
+            ]
+        
+        # Apply field/value filter
+        if self.filter_field is not None and self.filter_value:
+            filtered = [
+                e for e in filtered if self.filter_value in e[self.filter_field]]
+        
+        # Apply search filter
+        if self.search_text:
+            text = self.search_text.lower()
+            filtered = [e for e in filtered if any(
+                text in field.lower() for field in e)]
+
+        # Store filtered results
+        self.filtered_entries = filtered
+        
+        # Update pagination
+        self._update_pagination()
+        
+        # Display the current page
+        self._display_current_page()
+        
+        # Update status
+        self.app.set_status_message(
+            f"Showing {len(self.filtered_entries)} entries ({self.current_page}/{self.total_pages})")
+
+    def _is_date_in_range(self, date_str, start_date, end_date):
+        """Check if a date string is within the specified range"""
+        try:
+            # Convert MM/DD/YYYY to a date object for comparison
+            parts = date_str.split('/')
+            if len(parts) != 3:
+                return False
+                
+            month, day, year = map(int, parts)
+            date = QDate(year, month, day)
+            
+            return date >= start_date and date <= end_date
+        except Exception:
+            return False
+
+    def on_page_size_changed(self):
+        """Handle change in entries per page"""
+        self.entries_per_page = self.entries_per_page_combo.currentText()
+        self.current_page = 1  # Reset to first page
+        self._update_pagination()
+        self._display_current_page()
+
+    def prev_page(self):
+        """Go to previous page"""
+        if self.current_page > 1:
+            self.current_page -= 1
+            # Update page combo to match
+            self.page_combo.setCurrentText(str(self.current_page))
+            self._display_current_page()
+
+    def next_page(self):
+        """Go to next page"""
+        if self.current_page < self.total_pages:
+            self.current_page += 1
+            # Update page combo to match
+            self.page_combo.setCurrentText(str(self.current_page))
+            self._display_current_page()
+
+    def _update_pagination(self):
+        """Update pagination controls based on filtered entries"""
+        if self.entries_per_page == "All":
+            self.total_pages = 1
+        else:
+            entries_per_page = int(self.entries_per_page)
+            self.total_pages = max(1, (len(self.filtered_entries) + entries_per_page - 1) // entries_per_page)
+        
+        # Update page combo box
+        self.page_combo.blockSignals(True)
+        self.page_combo.clear()
+        self.page_combo.addItems([str(i) for i in range(1, self.total_pages + 1)])
+        
+        # Reset to page 1 or adjust if current page is out of range
+        self.current_page = min(self.current_page, self.total_pages)
+        if self.current_page < 1:
+            self.current_page = 1
+            
+        # Set current page in combo box
+        index = self.page_combo.findText(str(self.current_page))
+        if index >= 0:
+            self.page_combo.setCurrentIndex(index)
+        self.page_combo.blockSignals(False)
+        
+        # Update previous/next buttons
+        self.prev_page_btn.setEnabled(self.current_page > 1)
+        self.next_page_btn.setEnabled(self.current_page < self.total_pages)
+
+    def _display_current_page(self):
+        """Display the current page of log entries"""
+        self.log_tree.clear()
+        
+        if not self.filtered_entries:
+            return
+        
+        start_idx = 0
+        end_idx = len(self.filtered_entries)
+        
+        if self.entries_per_page != "All":
+            entries_per_page = int(self.entries_per_page)
+            start_idx = (self.current_page - 1) * entries_per_page
+            end_idx = min(start_idx + entries_per_page, len(self.filtered_entries))
+        
+        # Display the current page of entries
+        for entry in self.filtered_entries[start_idx:end_idx]:
+            item = QTreeWidgetItem(self.log_tree)
+            for i, value in enumerate(entry):
+                # Format total size column (index 10)
+                if i == 10:  # Total Size column
+                    formatted_size = format_size(value)
+                    item.setText(i, formatted_size)
+                    # Store original size for sorting
+                    item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
+                else:
+                    item.setText(i, value)
+        
+        # Auto-size columns for initial display
+        self._adjust_column_sizes(self.log_tree)
+
+    def on_filter_field_changed(self, index):
+        """Update value filter options when field selection changes"""
+        # Clear the value filter dropdown
+        self.value_filter_combo.clear()
+        
+        if index <= 0:  # "-- Select Field --" option
+            return
+            
+        # Get the selected field index (adjusted for header offset)
+        field_index = index - 1
+        
+        # Collect all unique values for the selected field
+        unique_values = set()
+        for entry in self.all_log_entries:
+            if len(entry) > field_index:
+                value = entry[field_index]
+                if value:  # Skip empty values
+                    unique_values.add(value)
+        
+        # Update the value filter dropdown
+        self.value_filter_combo.addItems(sorted(unique_values))
+        
+        # Make a nicer status message showing how many values were found
+        self.app.set_status_message(f"Found {len(unique_values)} unique values for {TRANSFER_LOG_HEADERS[field_index]}")
 
 
 def format_size(size_bytes):

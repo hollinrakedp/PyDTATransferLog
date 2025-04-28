@@ -33,9 +33,7 @@ class DTATransferLogApp(QMainWindow):
         self.tab_widget.addTab(self.log_tab, "Log")
 
         # Create review tab
-        current_year = datetime.datetime.now().strftime("%Y")
-        self.review_tab = TransferLogReviewerTab(
-            self.config, current_year, self)
+        self.review_tab = TransferLogReviewerTab(self.config, parent=self)
         self.tab_widget.addTab(self.review_tab, "Review")
 
         # Set up menu and toolbar
@@ -148,7 +146,7 @@ class DTATransferLogApp(QMainWindow):
         if index == 1:  # Review tab
             # Refresh log data when switching to review tab
             self.set_status_message("Refreshing log data...")
-            self.review_tab.load_log_file()
+            self.review_tab.load_log_data()
 
     def on_config_reloaded(self):
         """Notify all tabs that configuration has been reloaded"""

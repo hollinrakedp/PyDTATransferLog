@@ -23,11 +23,21 @@ def main():
     app.setApplicationName("DTA Transfer Log")
     app.setOrganizationName("DH")
     
-    # Load stylesheet if it exists
-    stylesheet_path = os.path.join("resources", "styles", "main.qss")
-    if os.path.exists(stylesheet_path):
-        with open(stylesheet_path, "r") as f:
-            app.setStyleSheet(f.read())
+    # Load stylesheet based on theme in config
+    theme = config.get("UI", "Theme", fallback="")
+    if theme:  # Only proceed if a theme was actually specified
+        theme_folder = os.path.join("resources", "styles", theme)
+        stylesheet_path = os.path.join(theme_folder, f"{theme}.qss")
+        
+        # Apply the stylesheet if file exists
+        if os.path.exists(stylesheet_path):
+            with open(stylesheet_path, "r") as f:
+                stylesheet = f.read()
+                #stylesheet = stylesheet.replace("icons/", f"{theme_folder}/icons/")
+                
+                app.setStyleSheet(stylesheet)
+        else:
+            print(f"Warning: Theme '{theme}' specified in config.ini was not found.")
     
     # Check command line args for review mode
     parser = argparse.ArgumentParser(description="DTA File Transfer Log")

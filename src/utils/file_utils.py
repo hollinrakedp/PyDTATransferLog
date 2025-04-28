@@ -106,12 +106,26 @@ def format_filename(template, data=None, config=None, counter=1):
         'timestamp': now.strftime("%Y%m%d-%H%M%S")
     }
     
+    # Determine transfer directionality
+    if config and 'source' in data and 'destination' in data:
+        local_network = config.get("UI", "LocalNetwork", fallback="")
+        direction = "Unknown"
+        
+        if local_network:
+            if data.get('destination') == local_network:
+                direction = "Incoming"
+            elif data.get('source') == local_network:
+                direction = "Outgoing"
+        
+        # Add direction to replacements
+        replacements['direction'] = direction
+    
     # Date and time formats
     date_format = config.get("Logging", "DateFormat", fallback="yyyyMMdd") if config else "yyyyMMdd"
     time_format = config.get("Logging", "TimeFormat", fallback="HHmmss") if config else "HHmmss"
     
     # Convert Python date format from config format
-    date_format = date_format.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+    date_format = date_format.replace("yyyy", "%Y").replace("yy", "%y").replace("MMMM", "%B").replace("MMM", "%b").replace("MM", "%m").replace("dd", "%d")
     time_format = time_format.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
     
     replacements['date'] = now.strftime(date_format)
@@ -126,7 +140,7 @@ def format_filename(template, data=None, config=None, counter=1):
             # Handle formatted tokens like {date:yyyy-MM-dd}
             name, fmt = token.split(':', 1)
             if name == 'date':
-                fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+                fmt = fmt.replace("yyyy", "%Y").replace("yy", "%y").replace("MMMM", "%B").replace("MMM", "%b").replace("MM", "%m").replace("dd", "%d")
                 return now.strftime(fmt)
             elif name == 'time':
                 fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")

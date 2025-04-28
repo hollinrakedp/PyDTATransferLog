@@ -455,6 +455,35 @@ class FileTransferLoggerTab(QWidget):
         # Add right panel to main layout
         main_layout.addWidget(right_panel)
 
+        # Add tooltips to combo boxes after they're created
+        self.media_type_combo.setToolTip("Type of media used for the file transfer (e.g., Flash drive, HDD)")
+        self.media_id_edit.setToolTip("Unique identifier for the media device used")
+        self.transfer_type_combo.setToolTip("Classification of the transfer between security domains")
+        self.source_combo.setToolTip("Network/system where the files originated")
+        self.destination_combo.setToolTip("Network/system where the files are being transferred to")
+
+        # Checksum checkbox tooltip
+        self.include_sha256_check.setToolTip("Calculate SHA256 hash values for each file\n(This may take a long time for large files)")
+
+        # Open log checkboxes tooltips
+        self.open_transfer_log_check.setToolTip("Automatically open the main transfer log after logging")
+        self.open_file_list_log_check.setToolTip("Automatically open the detailed file list after logging")
+
+        # Log folder tooltip
+        self.log_folder_edit.setToolTip("Location where log files will be saved (configured in config.ini)")
+
+        # Buttons tooltips
+        clear_btn.setToolTip("Remove all files from the list")
+        remove_selected_btn.setToolTip("Remove selected files from the list")
+        select_files_btn.setToolTip("Browse and select individual files")
+        select_folders_btn.setToolTip("Browse and select entire folders. All files will be included recursively.")
+
+        # File list tooltip
+        self.file_list.setToolTip("Files to be included in the transfer log. Drag and drop files or folders here.")
+
+        # Log Transfer button tooltip
+        log_transfer_btn.setToolTip("Create a log entry for this file transfer")
+
     def get_menu_actions(self):
         """Return actions for the menu when this tab is active"""
         actions = []
