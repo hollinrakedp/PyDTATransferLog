@@ -1,5 +1,8 @@
 import os
 import hashlib
+import re
+import datetime
+import socket
 
 def get_all_files(directory):
     """
@@ -76,3 +79,85 @@ def is_valid_file(filepath):
         bool: True if the file exists and is accessible, False otherwise
     """
     return os.path.isfile(filepath) and os.access(filepath, os.R_OK)
+
+def format_filename(template, data=None, config=None, counter=1):
+    """
+    Format a filename template by replacing tokens with their values.
+    
+    Args:
+        template: The filename template with tokens like {date}, {username}, etc.
+        data: Dictionary with additional data values
+        config: Config object for accessing configuration values
+        counter: Counter value for the {counter} token
+        
+    Returns:
+        The formatted filename with all tokens replaced
+    """
+    if not data:
+        data = {}
+    
+    # Base replacements (always available)
+    now = datetime.datetime.now()
+    replacements = {
+        'username': os.getlogin(),
+        'computername': socket.gethostname(),
+        'counter': str(counter).zfill(3),
+        'year': now.strftime("%Y"),
+        'timestamp': now.strftime("%Y%m%d-%H%M%S")
+    }
+    
+    # Date and time formats
+    date_format = config.get("Logging", "DateFormat", fallback="yyyyMMdd") if config else "yyyyMMdd"
+    time_format = config.get("Logging", "TimeFormat", fallback="HHmmss") if config else "HHmmss"
+    
+    # Convert Python date format from config format
+    date_format = date_format.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+    time_format = time_format.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+    
+    replacements['date'] = now.strftime(date_format)
+    replacements['time'] = now.strftime(time_format)
+    
+    # Add any additional data
+    replacements.update(data)
+    
+    def replace_token(match):
+        token = match.group(1)
+        if ':' in token:
+            # Handle formatted tokens like {date:yyyy-MM-dd}
+            name, fmt = token.split(':', 1)
+            if name == 'date':
+                fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+                return now.strftime(fmt)
+            elif name == 'time':
+                fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+                return now.strftime(fmt)
+            else:
+                return replacements.get(name, match.group(0))
+        else:
+            return replacements.get(token, match.group(0))
+    
+    # Replace tokens in the template
+    result = re.sub(r'\{([^}]+)\}', replace_token, template)
+    
+    # Make sure the filename is valid
+    result = sanitize_filename(result)
+    
+    return result
+
+
+def sanitize_filename(filename):
+    """
+    Sanitize a filename to ensure it's valid on the current platform
+    """
+    # Replace invalid characters
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    
+    # Ensure filename isn't too long
+    max_length = 240  # Windows MAX_PATH is 260, leave room for path
+    if len(filename) > max_length:
+        name, ext = os.path.splitext(filename)
+        filename = name[:max_length-len(ext)] + ext
+        
+    return filename

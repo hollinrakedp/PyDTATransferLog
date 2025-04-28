@@ -476,6 +476,17 @@ class FileTransferLoggerTab(QWidget):
         log_action.setShortcut("Ctrl+S")
         log_action.triggered.connect(self.log_transfer)
         actions.append(log_action)
+        
+        # Add separator
+        separator = QAction(self)
+        separator.setSeparator(True)
+        actions.append(separator)
+        
+        # Reload Configuration
+        reload_config_action = QAction("&Reload Configuration", self)
+        reload_config_action.setShortcut("Ctrl+R")
+        reload_config_action.triggered.connect(self.reload_configuration)
+        actions.append(reload_config_action)
 
         return actions
 
@@ -658,19 +669,19 @@ class FileTransferLoggerTab(QWidget):
         validation_errors = []
 
         if not self.media_id_edit.currentText():
-            validation_errors.append("Please enter Media ID")
+            validation_errors.append("Please enter a Media ID")
 
         if self.media_type_combo.currentIndex() == 0:
-            validation_errors.append("Please select Media Type")
+            validation_errors.append("Please select a Media Type")
 
         if self.transfer_type_combo.currentIndex() == 0:
-            validation_errors.append("Please select Transfer Type")
+            validation_errors.append("Please select a Transfer Type")
 
         if self.source_combo.currentIndex() == 0:
-            validation_errors.append("Please select Source")
+            validation_errors.append("Please select a Source")
 
         if self.destination_combo.currentIndex() == 0:
-            validation_errors.append("Please select Destination")
+            validation_errors.append("Please select a Destination")
 
         if not self.selected_files:
             validation_errors.append("No files selected to log")
@@ -834,3 +845,81 @@ class FileTransferLoggerTab(QWidget):
         # Close the progress dialog if it's open
         if hasattr(self, 'file_progress_dialog'):
             self.file_progress_dialog.close()
+
+    def reload_configuration(self):
+        """Reload configuration from file"""
+        try:
+            success = self.config.reload()
+            if success:
+                # Update UI components with new config values
+                self.app.set_status_message("Configuration reloaded successfully")
+                
+                # Update media types
+                self.media_types = self.config.get_list("UI", "MediaTypes")
+                current_media_type = self.media_type_combo.currentText()
+                self.media_type_combo.clear()
+                self.media_type_combo.addItem("-- Select --")
+                self.media_type_combo.addItems(self.media_types)
+                # Restore selection if still in list
+                index = self.media_type_combo.findText(current_media_type)
+                if index > 0:
+                    self.media_type_combo.setCurrentIndex(index)
+                
+                # Update network lists
+                self.network_list = self.config.get_list("UI", "NetworkList")
+                # Source
+                current_source = self.source_combo.currentText()
+                self.source_combo.clear()
+                self.source_combo.addItem("-- Select --")
+                self.source_combo.addItems(self.network_list)
+                index = self.source_combo.findText(current_source)
+                if index > 0:
+                    self.source_combo.setCurrentIndex(index)
+                # Destination
+                current_dest = self.destination_combo.currentText()
+                self.destination_combo.clear()
+                self.destination_combo.addItem("-- Select --")
+                self.destination_combo.addItems(self.network_list)
+                index = self.destination_combo.findText(current_dest)
+                if index > 0:
+                    self.destination_combo.setCurrentIndex(index)
+                
+                # Update transfer types
+                self.transfer_types = self.config.get_transfer_types()
+                current_transfer_type = self.transfer_type_combo.currentText()
+                self.transfer_type_combo.clear()
+                self.transfer_type_combo.addItem("-- Select --")
+                self.transfer_type_combo.addItems(list(self.transfer_types.keys()))
+                index = self.transfer_type_combo.findText(current_transfer_type)
+                if index > 0:
+                    self.transfer_type_combo.setCurrentIndex(index)
+                
+                # Update media ID list
+                media_id_prefixes = self.config.get_list("UI", "MediaID")
+                current_text = self.media_id_edit.currentText()
+                self.media_id_edit.clear()
+                self.media_id_edit.addItem("")
+                if media_id_prefixes:
+                    self.media_id_edit.addItems(media_id_prefixes)
+                if current_text:
+                    self.media_id_edit.setCurrentText(current_text)
+                
+                # Update log folder
+                log_output_folder = self.config.get("Logging", "OutputFolder", fallback="./logs")
+                self.log_folder_edit.setText(os.path.abspath(log_output_folder))
+                
+                # Show success message
+                QMessageBox.information(self, "Configuration Reloaded", 
+                                       "Configuration has been successfully reloaded.")
+                
+                # Notify the main app that config has changed
+                if hasattr(self, 'app') and hasattr(self.app, 'on_config_reloaded'):
+                    self.app.on_config_reloaded()
+            else:
+                self.app.set_status_message("Failed to reload configuration")
+                QMessageBox.warning(self, "Reload Failed", 
+                                   "Failed to reload the configuration file.")
+        except Exception as e:
+            self.app.set_status_message(f"Error reloading configuration: {str(e)}")
+            QMessageBox.critical(self, "Error", 
+                                f"Error reloading configuration: {str(e)}")

@@ -4,7 +4,7 @@ import csv
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QComboBox, QPushButton, QSplitter, QTreeWidget,
                                QTreeWidgetItem, QLineEdit, QHeaderView,
-                               QFileDialog)
+                               QFileDialog, QMessageBox)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QAction, QIcon
 from constants import TRANSFER_LOG_HEADERS
@@ -162,6 +162,17 @@ class TransferLogReviewerTab(QWidget):
         export_action = QAction("&Export Current View...", self)
         export_action.triggered.connect(self.export_current_view)
         actions.append(export_action)
+        
+        # Add separator
+        separator = QAction(self)
+        separator.setSeparator(True)
+        actions.append(separator)
+        
+        # Reload Configuration
+        reload_config_action = QAction("&Reload Configuration", self)
+        reload_config_action.setShortcut("Ctrl+R")
+        reload_config_action.triggered.connect(self.reload_configuration)
+        actions.append(reload_config_action)
 
         return actions
 
@@ -185,38 +196,48 @@ class TransferLogReviewerTab(QWidget):
                 f"Log directory {self.log_dir} not found")
             return
 
-        # Get list of years to display
-        years = []
-        try:
-            for item in os.listdir(self.log_dir):
-                if item.startswith("TransferLog_") and item.endswith(".log"):
-                    # Extract year from filename
-                    year = item[len("TransferLog_"):-4]
-                    if year.isdigit() and len(year) == 4:
-                        years.append(year)
+        # Get template from config
+        template = self.config.get("Logging", "TransferLogName", fallback="TransferLog_{year}.log")
+        
+        # Extract the pattern that would represent the year
+        # This is a simplified approach - we're just looking for {year} token
+        # A more robust approach would parse the template more carefully
+        if "{year}" in template:
+            prefix = template.split("{year}")[0]
+            suffix = template.split("{year}")[1]
+            
+            # Get list of years to display
+            years = []
+            try:
+                for item in os.listdir(self.log_dir):
+                    if item.startswith(prefix) and item.endswith(suffix):
+                        # Extract year from filename based on the template pattern
+                        year_part = item[len(prefix):len(suffix)]
+                        if year_part.isdigit() and len(year_part) == 4:
+                            years.append(year_part)
 
-            # Add current year if not already in list
-            current_year = datetime.datetime.now().strftime("%Y")
-            if current_year not in years:
-                years.append(current_year)
+                # Add current year if not already in list
+                current_year = datetime.datetime.now().strftime("%Y")
+                if current_year not in years:
+                    years.append(current_year)
 
-            # Sort years in descending order
-            years.sort(reverse=True)
+                # Sort years in descending order
+                years.sort(reverse=True)
 
-            # Update combo box
-            self.year_combo.clear()
-            self.year_combo.addItems(years)
+                # Update combo box
+                self.year_combo.clear()
+                self.year_combo.addItems(years)
 
-            # Set to initially selected year or most recent
-            index = self.year_combo.findText(self.selected_year)
-            if index >= 0:
-                self.year_combo.setCurrentIndex(index)
-            else:
-                self.year_combo.setCurrentIndex(0)
+                # Set to initially selected year or most recent
+                index = self.year_combo.findText(self.selected_year)
+                if index >= 0:
+                    self.year_combo.setCurrentIndex(index)
+                else:
+                    self.year_combo.setCurrentIndex(0)
 
-        except Exception as e:
-            self.app.set_status_message(
-                f"Error loading available years: {str(e)}")
+            except Exception as e:
+                self.app.set_status_message(
+                    f"Error loading available years: {str(e)}")
 
     def on_year_changed(self):
         """Handle year selection change"""
@@ -436,6 +457,50 @@ class TransferLogReviewerTab(QWidget):
 
         except Exception as e:
             self.app.set_status_message(f"Error exporting data: {str(e)}")
+    
+    def update_log_directory(self):
+        """Update log directory from config and refresh data"""
+        new_log_dir = self.config.get("Logging", "OutputFolder", fallback="./logs")
+        if new_log_dir != self.log_dir:
+            self.log_dir = new_log_dir
+            self.app.set_status_message(f"Log directory updated to {self.log_dir}")
+            self.load_available_years()
+            self.load_log_file()
+        return self.log_dir
+
+    def reload_configuration(self):
+        """Reload configuration from file"""
+        try:
+            success = self.config.reload()
+            if success:
+                # Update log directory
+                new_log_dir = self.config.get("Logging", "OutputFolder", fallback="./logs")
+                old_log_dir = self.log_dir
+                
+                if new_log_dir != old_log_dir:
+                    self.log_dir = new_log_dir
+                    self.app.set_status_message(f"Log directory updated to {self.log_dir}")
+                    
+                    # Reload years list and log data with new directory
+                    self.load_available_years()
+                    self.load_log_file()
+                
+                # Show success message
+                QMessageBox.information(self, "Configuration Reloaded", 
+                                       "Configuration has been successfully reloaded.")
+                
+                # Notify the main app that config has changed (in case other components need updating)
+                if hasattr(self, 'app') and hasattr(self.app, 'on_config_reloaded'):
+                    self.app.on_config_reloaded()
+            else:
+                self.app.set_status_message("Failed to reload configuration")
+                QMessageBox.warning(self, "Reload Failed", 
+                                   "Failed to reload the configuration file.")
+        except Exception as e:
+            self.app.set_status_message(f"Error reloading configuration: {str(e)}")
+            QMessageBox.critical(self, "Error", 
+                                f"Error reloading configuration: {str(e)}")
+
 
 
 def format_size(size_bytes):

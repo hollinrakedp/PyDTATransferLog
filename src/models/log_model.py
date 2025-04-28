@@ -5,6 +5,7 @@ import io
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Union, BinaryIO
 from constants import FILE_LIST_HEADERS
+from utils.file_utils import format_filename
 
 
 @dataclass
@@ -228,9 +229,24 @@ class TransferLog:
 
     def save(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save the transfer log to CSV format with archive processing"""
-        # Create yearly log CSV file
-        year = datetime.datetime.now().strftime("%Y")
-        csv_file = os.path.join(log_dir, f"TransferLog_{year}.log")
+        # Get the transfer log filename template from config
+        template = self.config.get("Logging", "TransferLogName", 
+                                  fallback="TransferLog_{year}.log")
+        
+        # Prepare data for token replacement
+        data = {
+            'transfertype': self.transfer_type,
+            'source': self.source,
+            'destination': self.destination,
+            'mediatype': self.media_type,
+            'mediaid': self.media_id,
+            'username': self.username,
+            'computername': self.computer_name
+        }
+        
+        # Format the filename using the token system
+        log_filename = format_filename(template, data, self.config)
+        csv_file = os.path.join(log_dir, log_filename)
 
         # Check if file exists to determine if we need to write headers
         file_exists = os.path.isfile(csv_file)
@@ -279,16 +295,27 @@ class TransferLog:
 
     def _save_file_list(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save detailed file list with archive contents to CSV"""
-        # Create a unique file list CSV using the original naming convention
-        # Extract YYYYMMDD from timestamp
-        date_part = self.timestamp.split('-')[0]
-        base_name = f"{date_part}_{self.username}_{self.transfer_type}_{self.source}-{self.destination}"
-
-        # Increment counter for uniqueness
+        # Get filename template from config
+        template = self.config.get("Logging", "FileListName", 
+                             fallback="{timestamp}_{username}_{transfertype}_{source}-{destination}_FileList.csv")
+        
+        # Prepare data for token replacement
+        data = {
+            'transfertype': self.transfer_type,
+            'source': self.source,
+            'destination': self.destination,
+            'mediatype': self.media_type,
+            'mediaid': self.media_id,
+            'username': self.username,
+            'computername': self.computer_name,
+            'timestamp': self.timestamp
+        }
+        
+        # Find a unique filename using counter
         counter = 1
         while True:
-            file_list_name = f"{base_name}_{counter:03d}.csv"
-            file_list_path = os.path.join(log_dir, file_list_name)
+            file_list_filename = format_filename(template, data, self.config, counter)
+            file_list_path = os.path.join(log_dir, file_list_filename)
             if not os.path.exists(file_list_path):
                 break
             counter += 1
@@ -298,8 +325,7 @@ class TransferLog:
             writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
             # Write header
-            writer.writerow(
-                ["Level", "Container", "FullName", "Size", "FileHash"])
+            writer.writerow(["Level", "Container", "FullName", "Size", "FileHash"])
 
             # Process each file
             for file_path in files:
@@ -333,17 +359,30 @@ class TransferLog:
         return file_list_path
 
     def _save_file_list_with_progress(self, log_dir: str, files: List[str],
-                                      file_hashes: Optional[Dict[str,
-                                                                 str]] = None,
-                                      progress_signal=None, cancel_check=None) -> str:
+                                 file_hashes: Optional[Dict[str, str]] = None,
+                                 progress_signal=None, cancel_check=None) -> str:
         """Save detailed file list with archive contents to CSV with progress reporting"""
-        date_part = self.timestamp.split('-')[0]
-        base_name = f"{date_part}_{self.username}_{self.transfer_type}_{self.source}-{self.destination}"
-
+        # Get filename template from config
+        template = self.config.get("Logging", "FileListName", 
+                             fallback="{timestamp}_{username}_{transfertype}_{source}-{destination}_FileList.csv")
+        
+        # Prepare data for token replacement
+        data = {
+            'transfertype': self.transfer_type,
+            'source': self.source,
+            'destination': self.destination,
+            'mediatype': self.media_type,
+            'mediaid': self.media_id,
+            'username': self.username,
+            'computername': self.computer_name,
+            'timestamp': self.timestamp
+        }
+        
+        # Find a unique filename using counter
         counter = 1
         while True:
-            file_list_name = f"{base_name}_{counter:03d}.csv"
-            file_list_path = os.path.join(log_dir, file_list_name)
+            file_list_filename = format_filename(template, data, self.config, counter)
+            file_list_path = os.path.join(log_dir, file_list_filename)
             if not os.path.exists(file_list_path):
                 break
             counter += 1

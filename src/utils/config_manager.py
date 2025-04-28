@@ -108,3 +108,15 @@ class ConfigManager:
         """Save configuration to file"""
         with open(self.config_path, "w") as f:
             self.config.write(f)
+    
+    def reload(self):
+        """Reload configuration from file"""
+        try:
+            if os.path.exists(self.config_path):
+                self.config = CommentedConfigParser()
+                self.config.read(self.config_path)
+                return True
+            return False
+        except Exception as e:
+            print(f"Error reloading configuration: {str(e)}")
+            return False

@@ -49,6 +49,10 @@ class DTATransferLogApp(QMainWindow):
         # Connect tab changed signal to refresh data when switching to review tab
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
+        # Initialize menu with actions from the initial tab (index 0)
+        self._update_menu(0)
+        self._update_toolbar(0)
+
         # Set reasonable initial size
         self.resize(1000, 700)
 
@@ -145,3 +149,10 @@ class DTATransferLogApp(QMainWindow):
             # Refresh log data when switching to review tab
             self.set_status_message("Refreshing log data...")
             self.review_tab.load_log_file()
+
+    def on_config_reloaded(self):
+        """Notify all tabs that configuration has been reloaded"""
+        # Update review tab
+        if hasattr(self, 'review_tab'):
+            self.review_tab.update_log_directory()
+        self.set_status_message("All tabs updated with new configuration")
