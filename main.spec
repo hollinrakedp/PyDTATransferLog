@@ -5,7 +5,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('config.ini', '.'),
+        ('src/config.ini', '.'),
         ('src/resources', 'resources'),
     ],
     hiddenimports=[],
