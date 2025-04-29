@@ -82,18 +82,20 @@ class FileTransferLogger:
         # Update the GUI variable
         self.log_output_var.set(self.log_output_folder)
 
-        self.media_types = self._get_config_list("MediaTypes", "Options")
+        self.media_types = self._get_config_list("MediaTypes")
+        self.network_list = self._get_config_list("NetworkList")
         self.transfer_types = self._get_transfer_types()
-        self.network_list = self._get_config_list("NetworkList", "Options")
 
         self._build_ui()
 
-    def _get_config_list(self, section, option):
-        items = self.config.get(section, option, fallback="")
+    def _get_config_list(self, option):
+        """Get a list of items from the UI section of the config"""
+        items = self.config.get("UI", option, fallback="")
         return [item.strip() for item in items.split(",") if item.strip()]
 
     def _get_transfer_types(self):
-        items = self.config.get("TransferTypes", "Options", fallback="")
+        """Parse transfer types from the UI section"""
+        items = self.config.get("UI", "TransferTypes", fallback="")
         mapping = {}
         for pair in items.split(","):
             if ":" in pair:
@@ -674,8 +676,8 @@ def run_cli():
     config = configparser.ConfigParser()
     config.read(os.path.join(os.getcwd(), "config.ini"))
     transfer_types = {}
-    if config.has_option("TransferTypes", "Options"):
-        for pair in config.get("TransferTypes", "Options").split(","):
+    if config.has_option("UI", "TransferTypes"):
+        for pair in config.get("UI", "TransferTypes").split(","):
             if ":" in pair:
                 long, short = pair.split(":", 1)
                 transfer_types[long.strip()] = short.strip()
@@ -716,11 +718,18 @@ def run_cli():
     # Minimal non-GUI log generation
     from datetime import datetime
 
-    log_output_folder = args.output or "./logs"
+    # Update log folder path reference
+    log_output_folder = config.get("Logging", "OutputFolder", fallback="./logs")
     os.makedirs(log_output_folder, exist_ok=True)
     current_date = datetime.now().strftime("%Y%m%d")
     username = getpass.getuser()
-    base_name = f"{current_date}_{username}_{transfer_type_abbr}_{args.source}-{args.destination}"
+    transfer_type_abbr = transfer_types.get(
+        args.transfer_type, "UNK")
+    source = args.source
+    destination = args.destination
+    base_name = f"{current_date}_{username}_{transfer_type_abbr}_{source}-{destination}"
+
+    # Increment the counter for unique file names
     counter = 1
     while True:
         file_list_log_name = f"{base_name}_{counter:03d}.log"
@@ -729,6 +738,10 @@ def run_cli():
         if not os.path.exists(file_list_log_path):
             break
         counter += 1
+
+    # Update delimiter and file prefixes
+    delimiter = config.get("Logging", "FileDelimiter", fallback="_")
+    transfer_log_prefix = config.get("Logging", "TransferLogPrefix", fallback="DTATransferLog")
 
     def sha256sum(filename):
         h = hashlib.sha256()
