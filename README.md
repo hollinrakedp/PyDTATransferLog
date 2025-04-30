@@ -165,17 +165,22 @@ The UI section controls the application's appearance and available options in th
 ```ini
 [UI]
 Theme = Light
-MediaTypes = Flash Drive, HDD, SSD, Network
-TransferTypes = Low to High:L2H, High to Low:H2L
-NetworkList = Intranet, Internet, Customer, Vendor
+MediaTypes = Apricorn, Blu-ray, CD, DVD, Flash, HDD, microSD, SD, SSD
+TransferTypes = Low to High:L2H, High to High:H2H, High to Low:H2L
+NetworkList = Intranet, Customer, IS001, System 99
 LocalNetwork = Intranet
+MediaID = CN-123-
 ```
 
-- **Theme**: Controls the application's visual theme (Light, Dark)
-- **MediaTypes**: Comma-separated list of media types available in the dropdown
-- **TransferTypes**: Comma-separated list of transfer types with optional abbreviations (Type:Abbreviation)
-- **NetworkList**: Available networks for source and destination fields
-- **LocalNetwork**: Your local network name (helps determine transfer direction)
+- **Theme**: Controls the application's visual theme (e.g., kaleidoscope). Leave blank to use the default theme.
+- **MediaTypes**: Comma-separated list of media types available in the dropdown. These represent the physical or virtual storage media used for file transfers.
+- **TransferTypes**: Comma-separated list of transfer types with their abbreviations (Type:Abbreviation). Examples include:
+  - "Low to High:L2H" - For transfers from lower to higher security systems
+  - "High to High:H2H" - For transfers between systems of equal high security
+  - "High to Low:H2L" - For transfers from higher to lower security systems
+- **NetworkList**: Available networks or systems for source and destination fields. These should represent all the networks or systems between which transfers might occur.
+- **LocalNetwork**: Your local network name (helps determine transfer direction automatically). This should match one of the entries in NetworkList and will be used to determine if transfers are Incoming or Outgoing.
+- **MediaID**: Prefixes for media identifiers or control numbers. These will be pre-populated in the Media ID field, allowing users to simply add unique identifiers afterward.
 
 #### Logging Section
 
@@ -185,24 +190,21 @@ The Logging section controls how and where logs are generated:
 [Logging]
 OutputFolder = ./logs
 TransferLogName = TransferLog_{year}.log
-FileListName = {date}_{username}_{transfertype}_{source}-{destination}_{counter}.log
+FileListName = {date:yyyy-MM-dd}_{username}_{transfertype}_{source}-{destination}_FileList.csv
 DateFormat = yyyyMMdd
 TimeFormat = HHmmss
-MaxFileScanDepth = 5
-IncludeEmptyFolders = True
-DefaultSHA256 = False
-MaxFilesBeforeConfirm = 1000
 ```
 
-- **OutputFolder**: Directory where logs will be saved (relative or absolute path)
-- **TransferLogName**: Template for main log file naming
-- **FileListName**: Template for individual transfer log naming
-- **DateFormat**: Format for date tokens in filenames
-- **TimeFormat**: Format for time tokens in filenames
-- **MaxFileScanDepth**: Maximum folder depth to scan for files
-- **IncludeEmptyFolders**: Whether to include empty folders in logs (True/False)
-- **DefaultSHA256**: Default setting for SHA-256 checksum generation (True/False)
-- **MaxFilesBeforeConfirm**: Show confirmation if transfer contains more than this number of files
+- **OutputFolder**: Directory where logs will be saved. You can use either:
+  - Relative paths (e.g., `./logs` for a logs folder in the application directory)
+  - Absolute paths (e.g., `C:\TransferLogs` or `/var/log/transfers`)
+  - Ensure the specified path exists or has proper permissions for file creation
+- **TransferLogName**: Template for main log file naming, which tracks all transfers in a single file.
+- **FileListName**: Template for individual transfer log naming. Each file transfer operation generates a separate file with this naming pattern.
+  - Default format produces filenames like: `2025-04-29_Darren_L2H_Intranet-Customer_FileList.csv`
+  - You can combine any of the tokens listed below to create custom naming patterns
+- **DateFormat**: Format for date tokens in filenames when using the simple {date} token
+- **TimeFormat**: Format for time tokens in filenames when using the simple {time} token
 
 ### File Naming Tokens
 
@@ -210,49 +212,74 @@ The application supports the following tokens in log file names:
 
 | Token | Description | Example |
 |-------|-------------|---------|
-| `{date}` | Current date | 20250428 |
-| `{date:format}` | Custom format date | 2025-04-28 |
-| `{time}` | Current time | 153045 |
-| `{time:format}` | Custom format time | 15:30:45 |
-| `{timestamp}` | Date and time | 20250428-153045 |
-| `{username}` | Current user | Darren |
+| `{date}` | Current date in format specified by DateFormat | 20250429 |
+| `{date:format}` | Custom format date | 2025-04-29 (with format yyyy-MM-dd) |
+| `{time}` | Current time in format specified by TimeFormat | 153045 |
+| `{time:format}` | Custom format time | 15:30:45 (with format HH:mm:ss) |
+| `{timestamp}` | Date and time combined | 20250429-153045 |
+| `{username}` | Current system user | Darren |
 | `{computername}` | Computer name | WORKSTATION-01 |
-| `{transfertype}` | Transfer type | L2H |
-| `{source}` | Source system | Intranet |
-| `{destination}` | Destination system | Customer |
-| `{direction}` | Transfer direction | Outgoing |
-| `{mediatype}` | Type of media | Flash Drive |
-| `{mediaid}` | Media identifier | USB123 |
-| `{counter}` | Sequential number | 001 |
+| `{transfertype}` | Transfer type abbreviation | L2H |
+| `{source}` | Source network/system | Intranet |
+| `{destination}` | Destination network/system | Customer |
+| `{direction}` | Transfer direction (based on LocalNetwork) | Incoming or Outgoing |
+| `{mediatype}` | Type of media | Flash |
+| `{mediaid}` | Media identifier | CN-123-456 |
+| `{counter}` | Sequential number for multiple transfers | 001 |
 | `{year}` | Current year | 2025 |
+
+### Customizing Date and Time Formats
+
+When using the extended date and time tokens (`{date:format}` and `{time:format}`), you can use the following format specifiers:
+
+- For dates:
+  - `yyyy`: Four-digit year (2025)
+  - `yy`: Two-digit year (25)
+  - `MM`: Two-digit month (04)
+  - `MMM`: Three-letter month abbreviation (Apr)
+  - `MMMM`: Full month name (April)
+  - `dd`: Two-digit day (29)
+  
+- For times:
+  - `HH`: Two-digit hour in 24-hour format (15)
+  - `hh`: Two-digit hour in 12-hour format (03)
+  - `mm`: Two-digit minutes (30)
+  - `ss`: Two-digit seconds (45)
+  - `tt`: AM/PM indicator (PM)
 
 ### Example Configuration
 
-Here's a complete example configuration:
+Here's a complete example configuration with explanations:
 
 ```ini
 [UI]
-Theme = Light
-MediaTypes = Flash Drive, HDD, SSD, Network, CD/DVD, Tape
-TransferTypes = Low to High:L2H, High to Low:H2L, Lateral:LAT
-NetworkList = Intranet, Internet, Customer, Vendor, Partner, Cloud
+Theme = kaleidoscope
+MediaTypes = Apricorn, Blu-ray, CD, DVD, Flash, HDD, microSD, SD, SSD, Network
+TransferTypes = Low to High:L2H, High to High:H2H, High to Low:H2L, Lateral:LAT
+NetworkList = Intranet, Customer, IS001, System 99, Vendor, Cloud
 LocalNetwork = Intranet
+MediaID = CN-123-
 
 [Logging]
-OutputFolder = ./logs
+OutputFolder = C:\TransferLogs
 TransferLogName = TransferLog_{year}.log
-FileListName = {date}_{username}_{transfertype}_{source}-{destination}_{counter}.log
+FileListName = {date:yyyy-MM-dd}_{username}_{transfertype}_{source}-{destination}_CN{mediaid}.csv
 DateFormat = yyyyMMdd
 TimeFormat = HHmmss
-MaxFileScanDepth = 5
-IncludeEmptyFolders = True
-DefaultSHA256 = False
-MaxFilesBeforeConfirm = 1000
 ```
 
-This configuration would create log files like:
-- `TransferLog_2025.log` (Transfer Log)
-- `20250428_Darren_L2H_Intranet-Customer_001.log` (File List Log)
+This configuration would create:
+- A main log file named `TransferLog_2025.log` in the C:\TransferLogs directory
+- Individual transfer logs like `2025-04-29_Steve_L2H_Intranet-Customer_CN456.csv` for each transfer operation
+
+### Applying Configuration Changes
+
+Changes to the `config.ini` file will take effect the next time you start the application. If the file is missing or corrupted, the application will create a new one with default values.
+
+For organizations deploying PyDTATransferLog to multiple systems, consider:
+1. Creating a standardized `config.ini` file with your organization's requirements
+2. Distributing this file with your application deployment
+3. Setting appropriate file permissions to prevent unauthorized modifications
 
 ## Development
 
