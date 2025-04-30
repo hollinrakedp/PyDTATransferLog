@@ -8,16 +8,21 @@ class CommentedConfigParser(configparser.ConfigParser):
         super().__init__()
         self.comments = {
             "UI": {
-                "_section": "UI section contains user interface settings",
+                "_section": "; UI section contains user interface settings",
                 "MediaTypes": "; Specifies the list of available media types that can be selected in the application.\n; These are the types of storage media used for file transfers.",
                 "TransferTypes": "; Specifies the available transfer types and their abbreviations.\n; Format: <Full Name>:<Abbreviation>\n; Example: \"Low to High\" is abbreviated as \"L2H\".",
                 "NetworkList": "; Specifies the list of available networks for the source and destination.\n; These represent the networks involved in the file transfer.\n; Example: IS001, System 99",
-                "MediaID": "",
-                "Theme": ""
+                "LocalNetwork": "; Specifies your local network/system name. Used to determine transfer direction (Incoming/Outgoing).\n; This should match one of the options in the NetworkList.",
+                "MediaID": "; Specifies the list of available Media IDs that will be pre-populated for the user.\n; These may often be called a Control Number.",
+                "Theme": "; Sets the theme to use for the application interface.\n; Leave blank to use the default theme.\n; Available themes: kaleidoscope"
             },
             "Logging": {
-                "_section": "Logging section contains settings for log file generation",
+                "_section": "; Logging section contains settings for log file generation",
                 "OutputFolder": "; Specifies the default folder where log files will be saved.\n; This path can be customized to store logs in a specific directory.\n; You can use a relative path (e.g., ./logs) or an absolute path (e.g., C:\\logs).\n; Ensure that the specified folder exists before running the application.",
+                "TransferLogName": "; Specify the Transfer log name\n; Available tokens:\n; {date} - Current date\n; {date:format} - Current date (format can be yyyyMMdd, yyyy-MM-dd, etc.)\n; {time} - Current time\n; {time:format} - Current time (format can be HHmmss, HH-mm-ss, etc.)\n; {timestamp} - Timestamp in format yyyyMMdd-HHmmss\n; {username} - Current username\n; {computername} - Computer name\n; {transfertype} - Transfer type abbreviation (L2H, H2H, etc.)\n; {source} - Source network/system\n; {destination} - Destination network/system\n; {direction} - Transfer direction (Incoming/Outgoing) based on LocalNetwork setting\n; {mediatype} - Type of media (Flash, HDD, etc.)\n; {mediaid} - Media identifier\n; {counter} - Sequential number\n; {year} - Current year",
+                "FileListName": "; Format for the file list CSV filename",
+                "DateFormat": "; Date format for the {date} token if used",
+                "TimeFormat": "; Time format for the {time} token if used",
                 "FileDelimiter": "; - Delimiter: The character used to separate parts of the log file name.",
                 "TransferLogPrefix": "; The base name for the transfer log file.",
                 "FileListPrefix": "; The base name for the file list log file."
