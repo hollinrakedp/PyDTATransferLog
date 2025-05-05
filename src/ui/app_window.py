@@ -6,6 +6,7 @@ from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Qt
 from ui.log_window import FileTransferLoggerTab
 from ui.review_window import TransferLogReviewerTab
+from src.version import VERSION
 
 
 class DTATransferLogApp(QMainWindow):
@@ -138,11 +139,11 @@ class DTATransferLogApp(QMainWindow):
 
     def show_about(self):
         """Display information about the application"""
-        about_text = """
+        about_text = f"""
         <h2>DTA File Transfer Log</h2>
         <p>© 2025 Darren Hollinrake</p>
         <p>Licensed under the MIT License.</p>
-        <p>Version 1.0</p>
+        <p>Version {VERSION}</p>
         """
 
         QMessageBox.about(self, "About DTA File Transfer Log", about_text)
