@@ -6,7 +6,7 @@ from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Qt
 from ui.log_window import FileTransferLoggerTab
 from ui.review_window import TransferLogReviewerTab
-from src.version import VERSION
+from version import VERSION
 
 
 class DTATransferLogApp(QMainWindow):
