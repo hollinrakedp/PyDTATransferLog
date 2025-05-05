@@ -12,10 +12,17 @@ class ConfigManager:
         if hasattr(sys, '_MEIPASS'):
             self.base_path = sys._MEIPASS  # Temporary directory for PyInstaller
         else:
-            self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Parent of utils directory
+            self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        # User config is always in the current working directory for consistency
-        self.config_path = os.path.join(os.getcwd(), config_filename)
+        # Always keep config with the executable
+        if getattr(sys, 'frozen', False):
+            # PyInstaller bundle
+            executable_dir = os.path.dirname(sys.executable)
+        else:
+            # Normal Python environment
+            executable_dir = os.getcwd()
+        
+        self.config_path = os.path.join(executable_dir, config_filename)
         
         # Path to the bundled config
         self.bundled_config_path = os.path.join(self.base_path, config_filename)
