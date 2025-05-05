@@ -10,7 +10,35 @@ on:
   #    - main  # Trigger the workflow on pull requests to the 'main' branch
 
 jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for version tracking
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11.x
+
+      - name: Update Version Information
+        run: |
+          mkdir -p src
+          python scripts/update_version.py
+
+      - name: Commit updated version
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add version.txt src/version.py
+          # Only commit if there are changes
+          git diff --staged --quiet || git commit -m "Auto-increment build number [skip ci]"
+          git push
+
   build:
+    needs: update-version
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, rhel9]
@@ -25,9 +53,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # Step 1: Check out the repository
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
 
       # Step 2: Set up Python
       - name: Set up Python
@@ -61,28 +90,6 @@ jobs:
         if: matrix.os == 'rhel9'
         run: |
           sudo dnf install -y python3.11-tkinter
-
-      # Step 4c: Update Version Information
-      - name: Update Version Information
-        shell: bash
-        run: |
-          mkdir -p src
-          if [ "${{ matrix.os }}" = "rhel9" ]; then
-            python3.11 scripts/update_version.py
-          else
-            python scripts/update_version.py
-          fi
-          
-      # Step 4d: Commit updated version (only on Windows build to avoid conflicts)
-      - name: Commit updated version
-        if: matrix.os == 'windows-latest'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add version.txt
-          # Only commit if there are changes
-          git diff --staged --quiet || git commit -m "Auto-increment build number [skip ci]"
-          git push
 
       # Step 5: Build the executable
       - name: Build executable with PyInstaller
