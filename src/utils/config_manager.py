@@ -1,82 +1,61 @@
 import os
+import sys
+import shutil
 import configparser
-
-class CommentedConfigParser(configparser.ConfigParser):
-    """ConfigParser that preserves comments"""
-    
-    def __init__(self):
-        super().__init__()
-        self.comments = {
-            "UI": {
-                "_section": "UI section contains user interface settings",
-                "MediaTypes": "; Specifies the list of available media types that can be selected in the application.\n; These are the types of storage media used for file transfers.",
-                "TransferTypes": "; Specifies the available transfer types and their abbreviations.\n; Format: <Full Name>:<Abbreviation>\n; Example: \"Low to High\" is abbreviated as \"L2H\".",
-                "NetworkList": "; Specifies the list of available networks for the source and destination.\n; These represent the networks involved in the file transfer.\n; Example: IS001, System 99",
-                "MediaID": "",
-                "Theme": ""
-            },
-            "Logging": {
-                "_section": "Logging section contains settings for log file generation",
-                "OutputFolder": "; Specifies the default folder where log files will be saved.\n; This path can be customized to store logs in a specific directory.\n; You can use a relative path (e.g., ./logs) or an absolute path (e.g., C:\\logs).\n; Ensure that the specified folder exists before running the application.",
-                "FileDelimiter": "; - Delimiter: The character used to separate parts of the log file name.",
-                "TransferLogPrefix": "; The base name for the transfer log file.",
-                "FileListPrefix": "; The base name for the file list log file."
-            }
-        }
-    
-    def write(self, fp):
-        """Write the configuration with comments"""
-        for section in self.sections():
-            fp.write(f"[{section}]\n")
-            if section in self.comments and "_section" in self.comments[section]:
-                fp.write(f"{self.comments[section]['_section']}\n")
-            
-            for key, value in self[section].items():
-                if section in self.comments and key in self.comments[section]:
-                    fp.write(f"{self.comments[section][key]}\n")
-                fp.write(f"{key} = {value}\n")
-            fp.write("\n")
 
 class ConfigManager:
     """Class for managing application configuration"""
 
-    DEFAULT_CONFIG = {
-        "UI": {
-            "MediaTypes": "Apricorn, Blu-ray, CD, DVD, Flash, HDD, microSD, SD, SSD",
-            "TransferTypes": "Low to High:L2H, High to High:H2H, High to Low:H2L",
-            "NetworkList": "Intranet, Customer, IS001, System 99",
-            "MediaID": "",
-            "Theme": "arc"
-        },
-        "Logging": {
-            "OutputFolder": "./logs",
-            "FileDelimiter": "_",
-            "TransferLogPrefix": "DTATransferLog",
-            "FileListPrefix": "DTAFileList"
-        }
-    }
-    
-    def __init__(self, config_path):
+    def __init__(self, config_filename="config.ini"):
         """Initialize the config manager"""
-        self.config_path = config_path
-        self.config = CommentedConfigParser()
-        
-        # Load config or create if doesn't exist
-        if os.path.exists(config_path):
-            self.config.read(config_path)
+        # Determine the base path based on whether we're running in PyInstaller or not
+        if hasattr(sys, '_MEIPASS'):
+            self.base_path = sys._MEIPASS  # Temporary directory for PyInstaller
         else:
+            self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Always keep config with the executable
+        if getattr(sys, 'frozen', False):
+            # PyInstaller bundle
+            executable_dir = os.path.dirname(sys.executable)
+        else:
+            # Normal Python environment
+            executable_dir = os.getcwd()
+        
+        self.config_path = os.path.join(executable_dir, config_filename)
+        
+        # Path to the bundled config
+        self.bundled_config_path = os.path.join(self.base_path, config_filename)
+        
+        # Initialize standard ConfigParser
+        self.config = configparser.ConfigParser()
+        
+        # Create default config if it doesn't exist
+        if not os.path.exists(self.config_path):
             self._create_default_config()
+        
+        # Load configuration
+        self.config.read(self.config_path)        
+        # Cache for transfer types mapping
+        self._transfer_types_cache = None
     
     def _create_default_config(self):
-        """Create a default configuration file"""
-        for section, options in self.DEFAULT_CONFIG.items():
-            if section not in self.config:
-                self.config.add_section(section)
+        """Create a default configuration file by copying the bundled config"""
+        try:
+            # Ensure bundled config exists
+            if not os.path.exists(self.bundled_config_path):
+                raise FileNotFoundError(f"Bundled configuration file not found at: {self.bundled_config_path}")
+                
+            # Create parent directories if they don't exist
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             
-            for option, value in options.items():
-                self.config.set(section, option, value)
-        
-        self.save()
+            # Copy the bundled config
+            shutil.copy(self.bundled_config_path, self.config_path)
+            print(f"Created default configuration at: {self.config_path}")
+            
+        except Exception as e:
+            print(f"ERROR: Failed to create default configuration: {str(e)}")
+            print("The application may not function correctly without a valid configuration file.")
     
     def get(self, section, option, fallback=None):
         """Get a configuration value"""
@@ -84,9 +63,8 @@ class ConfigManager:
     
     def set(self, section, option, value):
         """Set a configuration value"""
-        if section not in self.config:
+        if not self.config.has_section(section):
             self.config.add_section(section)
-        
         self.config.set(section, option, value)
     
     def get_list(self, section, option):
@@ -96,12 +74,19 @@ class ConfigManager:
     
     def get_transfer_types(self):
         """Get transfer types mapping from the UI section"""
+        # Use cached value if available
+        if self._transfer_types_cache is not None:
+            return self._transfer_types_cache
+            
         items = self.get("UI", "TransferTypes", fallback="")
         mapping = {}
         for pair in items.split(","):
             if ":" in pair:
                 name, abbr = pair.split(":", 1)
                 mapping[name.strip()] = abbr.strip()
+
+        # Cache the result
+        self._transfer_types_cache = mapping
         return mapping
     
     def save(self):
@@ -113,8 +98,9 @@ class ConfigManager:
         """Reload configuration from file"""
         try:
             if os.path.exists(self.config_path):
-                self.config = CommentedConfigParser()
+                self.config = configparser.ConfigParser()
                 self.config.read(self.config_path)
+                self._transfer_types_cache = None
                 return True
             return False
         except Exception as e:
