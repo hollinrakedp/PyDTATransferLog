@@ -1,4 +1,5 @@
 import os
+import sys
 import datetime
 from PySide6.QtWidgets import (QMainWindow, QTabWidget, QMessageBox)
 from PySide6.QtGui import QIcon, QAction
@@ -15,10 +16,19 @@ class DTATransferLogApp(QMainWindow):
         # Load configuration
         self.config = config
 
-        # Set up icon
-        icon_path = os.path.join("resources", "icons", "dtatransferlog.png")
+        # Determine the base path (for PyInstaller or Normal)
+        if getattr(sys, 'frozen', False):
+            # PyInstaller Bundle
+            base_path = sys._MEIPASS  # Access the temp directory PyInstaller uses
+            icon_path = os.path.join(base_path, "resources", "icons", "dtatransferlog.png")
+        else:
+            # Normal Execution
+            icon_path = os.path.join("resources", "icons", "dtatransferlog.png")
+        
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
+        else:
+            print(f"Warning: Window icon not found at {icon_path}")
 
         # Set up UI
         self._setup_ui()
