@@ -1,0 +1,36 @@
+/* Kaleidoscope Dark Theme */
+
+QWidget {
+    background-color: #251846;
+    color: #FFFFFF;
+}
+
+QPushButton {
+    background-color: #901588;
+    color: #FFFFFF;
+    border: 1px solid #D62CD0;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+QPushButton:hover {
+    background-color: #D62CD0;
+    color: #FFFFFF;
+}
+
+QPushButton:pressed {
+    background-color: #734CDD;
+    color: #FFFFFF;
+}
+
+QLineEdit {
+    background-color: #3B3937;
+    color: #FFFFFF;
+    border: 1px solid #D62CD0;
+    border-radius: 3px;
+    padding: 3px;
+}
+
+QLabel {
+    color: #D62CD0;
+}
