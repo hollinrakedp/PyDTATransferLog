@@ -1,7 +1,7 @@
 VSVersionInfo(
     ffi=FixedFileInfo(
-        filevers=(0, 0, 5, 0),  # File version (major, minor, build, revision)
-        prodvers=(0, 0, 5, 0),  # Product version
+        filevers=(0, 0, 6, 0),  # File version (major, minor, build, revision)
+        prodvers=(0, 0, 6, 0),  # Product version
         mask=0x3f,
         flags=0x0,
         OS=0x4,
@@ -17,12 +17,12 @@ VSVersionInfo(
                     [
                         StringStruct('CompanyName', 'Darren Hollinrake'),
                         StringStruct('FileDescription', 'DTA Transfer Log'),
-                        StringStruct('FileVersion', '0.0.5.0'),
+                        StringStruct('FileVersion', '0.0.6.0'),
                         StringStruct('InternalName', 'dtatransferlog.exe'),
                         StringStruct('LegalCopyright', '© 2025 Darren Hollinrake'),
                         StringStruct('OriginalFilename', 'dtatransferlog.exe'),
                         StringStruct('ProductName', 'DTA Transfer Log'),
-                        StringStruct('ProductVersion', '0.0.5.0')
+                        StringStruct('ProductVersion', '0.0.6.0')
                     ]
                 )
             ]
