@@ -1,6 +1,7 @@
 import sys
 import os
 import argparse
+import socket
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QDir
 from ui.app_window import DTATransferLogApp
