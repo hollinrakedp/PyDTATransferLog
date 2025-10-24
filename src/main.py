@@ -10,7 +10,7 @@ from version import VERSION
 
 def parse_tab_argument(tab_arg):
     """Parse tab argument - accepts numbers (0/1/2) or names (case-insensitive)"""
-    if tab_arg is None:
+    if tab_arg is None or tab_arg.strip() == "":
         return 0  # Default to Request tab
     
     # Try numeric first
@@ -108,10 +108,18 @@ For CLI mode help:
     # Create the main application window with tabs
     window = DTATransferLogApp(config)
     
-    # Set the starting tab based on --tab argument
+    # Set the starting tab based on --tab argument or config default
     if args.tab:
         tab_index = parse_tab_argument(args.tab)
-        window.tab_widget.setCurrentIndex(tab_index)
+    else:
+        # Check config for default tab
+        default_tab = config.get("UI", "DefaultTab", fallback="")
+        if default_tab:
+            tab_index = parse_tab_argument(default_tab)
+        else:
+            tab_index = 0  # Default to Request tab if no config setting
+    
+    window.tab_widget.setCurrentIndex(tab_index)
     
     window.show()
     sys.exit(app.exec())
