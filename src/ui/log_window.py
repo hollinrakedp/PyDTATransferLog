@@ -110,6 +110,7 @@ class FileProcessingWorker(QThread):
                     self.transfer_log.transfer_type,
                     self.transfer_log.source,
                     self.transfer_log.destination,
+                    self.transfer_log.request_id,
                     str(self.transfer_log.file_count),
                     str(self.transfer_log.total_size),
                     file_list_path
@@ -359,6 +360,10 @@ class FileTransferLoggerTab(QWidget):
         self.destination_combo = self._add_combo_field(
             left_layout, "Destination:", self.network_list)
 
+        # Request ID field (optional, for linking to external request systems)
+        self.request_id_edit = self._add_line_edit_field(
+            left_layout, "Request ID:", placeholder="YYYY-##### (optional)")
+
         # Calculate Checksums checkbox
         checksum_layout = QHBoxLayout()
         # Add padding to align with fields
@@ -572,6 +577,20 @@ class FileTransferLoggerTab(QWidget):
         layout.addLayout(field_layout)
         return line_edit
 
+    def _add_line_edit_field(self, layout, label_text, placeholder=""):
+        """Add a line edit field with label and optional placeholder text"""
+        field_layout = QHBoxLayout()
+        label = QLabel(label_text)
+        label.setFixedWidth(self.label_width)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        field_layout.addWidget(label)
+        line_edit = QLineEdit()
+        if placeholder:
+            line_edit.setPlaceholderText(placeholder)
+        field_layout.addWidget(line_edit)
+        layout.addLayout(field_layout)
+        return line_edit
+
     def _add_editable_combo_field(self, layout, label_text, options):
         """Add an editable combo box field with label"""
         field_layout = QHBoxLayout()
@@ -771,6 +790,7 @@ class FileTransferLoggerTab(QWidget):
             transfer_type=transfer_type,
             source=source,
             destination=destination,
+            request_id=self.request_id_edit.text().strip(),
             file_count=len(self.selected_files),
             total_size=self.total_size
         )

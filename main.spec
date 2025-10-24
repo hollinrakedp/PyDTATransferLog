@@ -17,7 +17,8 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(
+# GUI Version (windowed, no console)
+exe_gui = EXE(
     pyz,
     a.scripts,
     a.binaries,
@@ -31,6 +32,30 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=['src/resources/icons/dtatransferlog.ico'],
+    version='version.txt'
+)
+
+# CLI Version (console mode)
+exe_cli = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='dtatransferlog-cli',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
