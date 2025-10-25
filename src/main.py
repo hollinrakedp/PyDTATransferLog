@@ -2,11 +2,128 @@ import sys
 import os
 import argparse
 import socket
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PySide6.QtCore import QDir
+from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
 from version import VERSION
+
+def is_console_available():
+    """Check if console output is available"""
+    try:
+        # Try to get console window handle on Windows
+        if sys.platform == "win32":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            return kernel32.GetConsoleWindow() != 0
+        else:
+            # On other platforms, check if stdout is a TTY
+            return sys.stdout.isatty()
+    except:
+        return False
+
+def create_gui_parser():
+    """Create the same argument parser used in GUI mode for help extraction"""
+    parser = argparse.ArgumentParser(
+        description="DTA File Transfer Log",
+        epilog="""
+For CLI mode help:
+  python main.py -t --help    (Transfer logging)
+  python main.py -r --help    (File requests)
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("-t", "--transfer", action="store_true", help="Transfer Log CLI mode")
+    parser.add_argument("-r", "--request", action="store_true", help="Request CLI mode")
+    parser.add_argument("--tab", help="Starting tab (0/1/2 or request/log/review)")
+    parser.add_argument("-V", "--version", action="version", version=VERSION)
+    return parser
+
+def generate_gui_help_content():
+    """Generate help content for GUI dialog from argparse parser"""
+    import io
+    import contextlib
+    
+    # Create parser and capture its help output
+    parser = create_gui_parser()
+    
+    # Capture the help text
+    help_buffer = io.StringIO()
+    with contextlib.redirect_stdout(help_buffer):
+        try:
+            parser.print_help()
+        except SystemExit:
+            pass  # argparse calls sys.exit after print_help
+    
+    help_text = help_buffer.getvalue()
+    
+    # Add GUI-specific notes at the end
+    gui_notes = """
+
+NOTES FOR GUI EXECUTABLE:
+    - This GUI executable (dtatransferlog.exe) is optimized for interactive use
+    - For command-line operations, use dtatransferlog-cli.exe instead
+    - The CLI executable provides full command-line functionality with console output
+    
+For detailed documentation, use Help > Documentation from the menu bar."""
+    
+    return help_text + gui_notes
+
+def show_gui_help():
+    """Show help information in a GUI dialog when console is not available"""
+    # Create a minimal QApplication if one doesn't exist
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    
+    # Create help dialog
+    dialog = QDialog()
+    dialog.setWindowTitle("PyDTATransferLog Help")
+    dialog.setModal(True)
+    dialog.resize(700, 500)
+    
+    layout = QVBoxLayout()
+    
+    # Get help content from actual argparse parser
+    help_content = generate_gui_help_content()
+    
+    # Text display
+    text_edit = QTextEdit()
+    text_edit.setPlainText(help_content)
+    text_edit.setReadOnly(True)
+    text_edit.setFont(QFont("Consolas", 9))  # Monospace font
+    layout.addWidget(text_edit)
+    
+    # Close button
+    button_layout = QHBoxLayout()
+    button_layout.addStretch()
+    close_button = QPushButton("Close")
+    close_button.clicked.connect(dialog.accept)
+    button_layout.addWidget(close_button)
+    layout.addLayout(button_layout)
+    
+    dialog.setLayout(layout)
+    dialog.exec()
+    
+    # Exit after showing help
+    sys.exit(0)
+
+def check_for_help_request():
+    """Check if help was requested and handle appropriately"""
+    # Check for help arguments
+    help_args = ['--help', '-h']
+    
+    for arg in sys.argv[1:]:
+        if arg.lower() in help_args:
+            # If we're frozen (executable) and no console available, show GUI help
+            if getattr(sys, 'frozen', False) and not is_console_available():
+                show_gui_help()
+                return True
+            # Otherwise, let argparse handle it normally
+            break
+    
+    return False
 
 def parse_tab_argument(tab_arg):
     """Parse tab argument - accepts numbers (0/1/2) or names (case-insensitive)"""
@@ -37,6 +154,10 @@ def parse_tab_argument(tab_arg):
 
 def main():
     """Main application entry point for GUI mode"""
+    # Check for help requests first (before doing anything else)
+    if check_for_help_request():
+        return
+    
     # Store original working directory before changing it
     original_cwd = os.getcwd()
     
@@ -90,19 +211,7 @@ def main():
             print(f"Warning: Theme '{theme}' specified in config.ini was not found.")
     
     # Check command line args for review mode and show help for CLI modes
-    parser = argparse.ArgumentParser(
-        description="DTA File Transfer Log",
-        epilog="""
-For CLI mode help:
-  python main.py -t --help    (Transfer logging)
-  python main.py -r --help    (File requests)
-        """,
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument("-t", "--transfer", action="store_true", help="Transfer Log CLI mode")
-    parser.add_argument("-r", "--request", action="store_true", help="Request CLI mode")
-    parser.add_argument("--tab", help="Starting tab (0/1/2 or request/log/review)")
-    parser.add_argument("-V", "--version", action="version", version=VERSION)
+    parser = create_gui_parser()
     args = parser.parse_args()
     
     # Create the main application window with tabs
