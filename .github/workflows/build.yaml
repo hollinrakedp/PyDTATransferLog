@@ -86,7 +86,7 @@ jobs:
           # Check if Python is already installed
           if ! command -v $PYTHON_CMD &> /dev/null; then
             echo "Installing Python ${{ env.PYTHON_VERSION }}..."
-            sudo dnf install -y python${{ env.PYTHON_VERSION }} python${{ env.PYTHON_VERSION }}-pip python${{ env.PYTHON_VERSION }}-devel python${{ env.PYTHON_VERSION }}-venv
+            sudo dnf install -y python${{ env.PYTHON_VERSION }} python${{ env.PYTHON_VERSION }}-pip python${{ env.PYTHON_VERSION }}-devel
           else
             echo "Python ${{ env.PYTHON_VERSION }} is already installed"
           fi
