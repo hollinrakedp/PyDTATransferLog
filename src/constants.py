@@ -4,7 +4,7 @@
 TRANSFER_LOG_HEADERS = [
     "Timestamp", "Transfer Date", "Username", "Computer Name",
     "Media Type", "Media ID", "Transfer Type", "Source",
-    "Destination", "File Count", "Total Size", "File Log"
+    "Destination", "Request ID", "File Count", "Total Size", "File Log"
 ]
 
 # File List CSV headers
@@ -12,12 +12,27 @@ FILE_LIST_HEADERS = [
     "Level", "Container", "FullName", "Size", "File Hash"
 ]
 
+# Request Log CSV headers
+REQUEST_LOG_HEADERS = [
+    "Timestamp", "Request Date", "Requestor", "Computer Name",
+    "Purpose", "File Count", "Total Size", "File Log"
+]
+
+# Request File List CSV headers (same as regular file list)
+REQUEST_FILE_LIST_HEADERS = [
+    "Level", "Container", "FullName", "Size", "File Hash"
+]
+
 # UI display versions of headers (can be slightly different if needed)
 TRANSFER_LOG_DISPLAY_HEADERS = [
     "Timestamp", "Transfer Date", "Username", "ComputerName", "MediaType",
-    "MediaID", "TransferType", "Source", "Destination", "File Count", "Total Size", "File Log"
+    "MediaID", "TransferType", "Source", "Destination", "Request ID", "File Count", "Total Size", "File Log"
 ]
 
 FILE_LIST_DISPLAY_HEADERS = [
     "", "Folder", "Filename", "Size", "File Hash"
+]
+
+REQUEST_LOG_DISPLAY_HEADERS = [
+    "Timestamp", "Request Date", "Requestor", "ComputerName", "Purpose", "File Count", "Total Size", "File Log"
 ]

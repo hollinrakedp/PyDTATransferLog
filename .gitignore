@@ -2,3 +2,4 @@ logs/
 build/
 dist/
 __pycache__/
+requests/

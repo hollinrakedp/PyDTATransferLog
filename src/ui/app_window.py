@@ -6,6 +6,7 @@ from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Qt
 from ui.log_window import FileTransferLoggerTab
 from ui.review_window import TransferLogReviewerTab
+from ui.request_window import FileTransferRequestTab
 from version import VERSION
 
 
@@ -39,11 +40,15 @@ class DTATransferLogApp(QMainWindow):
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
 
-        # Create log tab
+        # Create request tab (first)
+        self.request_tab = FileTransferRequestTab(self.config, self)
+        self.tab_widget.addTab(self.request_tab, "Request")
+
+        # Create log tab (second)
         self.log_tab = FileTransferLoggerTab(self.config, self)
         self.tab_widget.addTab(self.log_tab, "Log")
 
-        # Create review tab
+        # Create review tab (third)
         self.review_tab = TransferLogReviewerTab(self.config, parent=self)
         self.tab_widget.addTab(self.review_tab, "Review")
 
@@ -109,7 +114,12 @@ class DTATransferLogApp(QMainWindow):
         self.tools_menu.clear()
 
         # Add tab-specific actions
-        if index == 0:  # Log tab
+        if index == 0:  # Request tab
+            if hasattr(self.request_tab, 'get_menu_actions'):
+                actions = self.request_tab.get_menu_actions()
+                for action in actions:
+                    self.tools_menu.addAction(action)
+        elif index == 1:  # Log tab
             if hasattr(self.log_tab, 'get_menu_actions'):
                 actions = self.log_tab.get_menu_actions()
                 for action in actions:
@@ -126,7 +136,12 @@ class DTATransferLogApp(QMainWindow):
         self.toolbar.clear()
 
         # Add tab-specific toolbar items
-        if index == 0:  # Log tab
+        if index == 0:  # Request tab
+            if hasattr(self.request_tab, 'get_toolbar_actions'):
+                actions = self.request_tab.get_toolbar_actions()
+                for action in actions:
+                    self.toolbar.addAction(action)
+        elif index == 1:  # Log tab
             if hasattr(self.log_tab, 'get_toolbar_actions'):
                 actions = self.log_tab.get_toolbar_actions()
                 for action in actions:
@@ -154,7 +169,7 @@ class DTATransferLogApp(QMainWindow):
 
     def _on_tab_changed(self, index):
         """Handle tab change events"""
-        if index == 1:  # Review tab
+        if index == 2:  # Review tab (now index 2 because Request is at index 1)
             # Refresh log data when switching to review tab
             self.set_status_message("Refreshing log data...")
             self.review_tab.load_log_data()

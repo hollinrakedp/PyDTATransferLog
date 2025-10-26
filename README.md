@@ -4,6 +4,7 @@ A cross-platform utility for logging file transfers between systems.
 
 ## Features
 
+- **File Transfer Request Generation**: Create detailed requests for file transfers with purpose justification and file inventories.
 - **Comprehensive Transfer Logging**: Create detailed logs of file transfers including user information, timestamps, source and destination systems, and transfer direction.
 - **Media Tracking**: Categorize transfers by media type (Flash Drive, HDD, SSD, etc.) and assign custom media IDs for better organization.
 - **Archive Inspection**: Automatically extract and log file listings from common archive formats:
@@ -15,7 +16,7 @@ A cross-platform utility for logging file transfers between systems.
 - **File Verification**: Generate SHA-256 checksums for transferred files to ensure data integrity.
 - **Archive Content Logging**: View and log the contents of archived files without extraction, providing visibility into packaged data.
 - **Transfer History**: Built-in log viewer to review past transfers with filtering and search capabilities.
-- **Flexible Interface**: User-friendly GUI with drag-and-drop support and an experimental command-line interface for automation.
+- **Flexible Interface**: User-friendly GUI with tabbed interface and command-line interface for automation.
 - **Cross-Platform Compatibility**: Works on Windows and Linux operating systems.
 - **Customizable Logging**: Configure log format, location, and naming conventions through a simple configuration file.
 
@@ -76,11 +77,12 @@ A cross-platform utility for logging file transfers between systems.
 1. After installation, the application will create a `config.ini` file in the `src` directory if it doesn't already exist.
 
 2. Review the default configuration settings and modify them as needed:
-   - Set the preferred output folder for logs
+   - Set the preferred output folder for transfer logs
+   - Set the preferred output folder for file transfer requests
    - Configure media types and transfer types
-   - Customize log file naming formats
+   - Customize log and request file naming formats
 
-3. The application will create a logs directory to store transfer logs if it doesn't exist.
+3. The application will create logs and requests directories to store transfer logs and file transfer requests if they don't exist.
 
 ## Usage
 
@@ -92,47 +94,121 @@ To use the PyDTATransferLog in GUI mode, follow these steps:
    - **From Binary**: Double-click the PyDTATransferLog executable
    - **From Source**: Run `python src/main.py`
 
-2. **Configure Transfer Details**:
+The application opens with a tabbed interface containing three main sections:
+
+#### Request Tab
+
+The Request tab allows you to generate file transfer requests for approval:
+
+1. **Configure Request Details**:
+   - **Requestor**: Enter the name of the person making the request
+   - **Purpose**: Provide justification or purpose for the file transfer request
+   - **Request Date**: Set the date of the request (defaults to current date)
+   - **Computer Name**: Computer name (defaults to current hostname)
+
+2. **Add Files and Folders**:
+   - Click the **Add Files** button to select individual files for the request
+   - Click the **Add Folders** button to select entire directories
+   - **Drag and Drop** files or folders directly into the file list area
+   - The application will automatically scan and display the selected items
+
+3. **File Verification**:
+   - Enable the **Generate SHA-256 Checksums** option to create checksums for all files
+   - Checksums are stored in the request file for verification purposes
+
+4. **Generate Request**:
+   - Click the **Create Request** button to generate the request file
+   - The application will process all files, collecting metadata
+   - A request file will be created according to the naming pattern in config.ini
+   - A confirmation dialog will appear when the request is complete
+
+#### Log Tab
+
+The Log tab is used for logging actual file transfers:
+
+1. **Configure Transfer Details**:
    - **Media Type**: Select the type of media used for transfer (Flash Drive, HDD, etc.)
    - **Media ID**: Enter a unique identifier for the transfer media
    - **Source**: Select or enter the source system name
    - **Destination**: Select or enter the destination system name
    - **Transfer Type**: Choose between "Low to High" (L2H) or other configured transfer types
 
-3. **Add Files and Folders**:
+2. **Add Files and Folders**:
    - Click the **Add Files** button to select individual files for logging
    - Click the **Add Folders** button to select entire directories
    - **Drag and Drop** files or folders directly into the file list area
    - The application will automatically scan and display the selected items
 
-4. **File Verification**:
+3. **File Verification**:
    - Enable the **Generate SHA-256 Checksums** option to create checksums for all files
    - Checksums are stored in the log file for future verification
 
-5. **Generate Transfer Log**:
+4. **Generate Transfer Log**:
    - Click the **Start Transfer** button to generate the log
    - The application will process all files and archives, collecting metadata
    - A log file will be created according to the naming pattern in config.ini
    - A confirmation dialog will appear when the log is complete
 
-6. **Review Transfer Logs**:
-   - Click the **Review** button to open the log viewer
+#### Review Tab
+
+The Review tab provides access to historical transfer logs:
+
+1. **Review Transfer Logs**:
    - Navigate through previous transfer logs
    - Search for specific transfers by date, user, or transfer type
    - View detailed file listings and checksums for each transfer
 
-### CLI Mode (Experimental)
+### Starting with a Specific Tab
 
-The command-line interface allows for scripted or automated logging of transfers. This mode is currently experimental and may not support all GUI features.
+You can control which tab the application opens to in two ways:
+
+#### Using Command Line Arguments
+
+```bash
+# Start with Request tab (default)
+python src/main.py --tab request
+# or
+python src/main.py --tab 0
+
+# Start with Log tab  
+python src/main.py --tab log
+# or
+python src/main.py --tab 1
+
+# Start with Review tab
+python src/main.py --tab review
+# or
+python src/main.py --tab 2
+```
+
+#### Using Configuration File
+
+Set the `DefaultTab` option in the `[UI]` section of `config.ini`:
+
+```ini
+[UI]
+DefaultTab = Log    # Opens to Log tab by default
+```
+
+**Note**: Command line arguments take priority over the configuration file setting. If you specify `--tab` on the command line, it will override the `DefaultTab` configuration.
+
+### CLI Mode
+
+The command-line interface allows for scripted or automated processing. The CLI supports two modes: **Transfer Logging** and **File Transfer Requests**.
+
+#### Transfer Logging CLI Mode
+
+Use the transfer logging mode to record actual file transfers:
 
 **Basic Usage**:
 
 ```bash
-python src/main.py -c --media-type "Flash Drive" --media-id "USB123" --transfer-type "L2H" --source "System1" --destination "System2" --files file1.txt file2.txt --folders folder1 folder2
+python src/main.py -t --media-type "Flash Drive" --media-id "USB123" --transfer-type "L2H" --source "System1" --destination "System2" --files file1.txt file2.txt --folders folder1 folder2
 ```
 
 **Available Options**:
 
+- `-t, --transfer`: Enable transfer logging CLI mode
 - `--media-type`: Type of transfer media (e.g., "Flash Drive", "HDD")
 - `--media-id`: Unique identifier for the media
 - `--transfer-type`: Type of transfer (e.g., "L2H" or "Low to High")
@@ -141,14 +217,58 @@ python src/main.py -c --media-type "Flash Drive" --media-id "USB123" --transfer-
 - `--files`: Space-separated list of files to include
 - `--folders`: Space-separated list of folders to include
 - `--sha256`: Enable SHA-256 checksum generation
-- `--list-archives`: Enable listing of files within archives
-- `--output-dir`: Specify an alternative output directory for logs
+- `--output`: Specify an alternative output directory for logs
 - `--help`: Display help information
 
 **Example with Checksums**:
 
 ```bash
-python src/main.py -c --media-type "HDD" --media-id "EXT-500GB" --transfer-type "L2H" --source "Workstation" --destination "Server" --files document.pdf image.jpg --folders /path/to/data --sha256 --list-archives
+python src/main.py -t --media-type "HDD" --media-id "EXT-500GB" --transfer-type "L2H" --source "Workstation" --destination "Server" --files document.pdf image.jpg --folders /path/to/data --sha256
+```
+
+#### File Transfer Request CLI Mode
+
+Use the request mode to generate file transfer requests for approval:
+
+**Basic Usage**:
+
+```bash
+python src/main.py -r --requestor "John Doe" --purpose "Project documentation transfer" --files file1.txt file2.txt --folders folder1 folder2
+```
+
+**Available Options**:
+
+- `-r, --request`: Enable file transfer request CLI mode
+- `--requestor`: Name of the person making the request (required)
+- `--purpose`: Purpose/justification for the request (required)
+- `--request-date`: Request date (MM/dd/yyyy format, defaults to today)
+- `--computer-name`: Computer name (defaults to current hostname)
+- `--files`: Space-separated list of files to include
+- `--folders`: Space-separated list of folders to include
+- `--sha256`: Enable SHA-256 checksum generation
+- `--output`: Specify an alternative output directory for requests
+- `--help`: Display help information
+
+**Example with Checksums**:
+
+```bash
+python src/main.py -r --requestor "Jane Smith" --purpose "Data analysis files for Q4 report" --request-date "12/15/2025" --files analysis.xlsx report.docx --folders /path/to/datasets --sha256
+```
+
+#### Version Information
+
+```bash
+python src/main.py -V
+python src/main.py --version
+```
+
+#### CLI Help
+
+Get help for specific CLI modes:
+
+```bash
+python src/main.py -t --help    # Transfer logging help
+python src/main.py -r --help    # File request help
 ```
 
 
@@ -170,6 +290,7 @@ TransferTypes = Low to High:L2H, High to High:H2H, High to Low:H2L
 NetworkList = Intranet, Customer, IS001, System 99
 LocalNetwork = Intranet
 MediaID = CN-123-
+DefaultTab = 
 ```
 
 - **Theme**: Controls the application's visual theme (e.g., kaleidoscope). Leave blank to use the default theme.
@@ -181,6 +302,40 @@ MediaID = CN-123-
 - **NetworkList**: Available networks or systems for source and destination fields. These should represent all the networks or systems between which transfers might occur.
 - **LocalNetwork**: Your local network name (helps determine transfer direction automatically). This should match one of the entries in NetworkList and will be used to determine if transfers are Incoming or Outgoing.
 - **MediaID**: Prefixes for media identifiers or control numbers. These will be pre-populated in the Media ID field, allowing users to simply add unique identifiers afterward.
+- **DefaultTab**: Sets which tab the application opens to by default. Valid options are:
+  - **Request**, **Log**, **Review** (case-insensitive) 
+  - **0**, **1**, **2** (numeric equivalents)
+  - Leave blank to default to the Request tab (0)
+
+#### Requests Section
+
+The Requests section controls how and where file transfer requests are generated:
+
+```ini
+[Requests]
+OutputFolder = ./requests
+EnableRequestLog = true
+RequestLogName = RequestLog_{year}.log
+FileListName = {date:yyyyMMdd}_{username}_Request_{counter}.csv
+DateFormat = yyyyMMdd
+TimeFormat = HHmmss
+```
+
+- **OutputFolder**: Directory where request files will be saved. You can use either:
+  - Relative paths (e.g., `./requests` for a requests folder in the application directory)
+  - Absolute paths (e.g., `C:\TransferRequests` or `/var/log/requests`)
+  - Ensure the specified path exists or has proper permissions for file creation
+- **EnableRequestLog**: Controls whether a summary log of all requests is created
+  - Set to `true` to create a summary log of all requests (recommended)
+  - Set to `false` to only create individual request file lists
+- **RequestLogName**: Template for main request log file naming, which tracks all requests in a single file
+  - Only used if EnableRequestLog is true
+  - Default format produces filenames like: `RequestLog_2025.log`
+- **FileListName**: Template for individual request file naming. Each request operation generates a separate file with this naming pattern
+  - Default format produces filenames like: `20250429_JohnDoe_Request_001.csv`
+  - You can combine any of the tokens listed below to create custom naming patterns
+- **DateFormat**: Format for date tokens in filenames when using the simple {date} token
+- **TimeFormat**: Format for time tokens in filenames when using the simple {time} token
 
 #### Logging Section
 
@@ -208,25 +363,27 @@ TimeFormat = HHmmss
 
 ### File Naming Tokens
 
-The application supports the following tokens in log file names:
+The application supports the following tokens in log and request file names:
 
-| Token | Description | Example |
-|-------|-------------|---------|
-| `{date}` | Current date in format specified by DateFormat | 20250429 |
-| `{date:format}` | Custom format date | 2025-04-29 (with format yyyy-MM-dd) |
-| `{time}` | Current time in format specified by TimeFormat | 153045 |
-| `{time:format}` | Custom format time | 15:30:45 (with format HH:mm:ss) |
-| `{timestamp}` | Date and time combined | 20250429-153045 |
-| `{username}` | Current system user | Darren |
-| `{computername}` | Computer name | WORKSTATION-01 |
-| `{transfertype}` | Transfer type abbreviation | L2H |
-| `{source}` | Source network/system | Intranet |
-| `{destination}` | Destination network/system | Customer |
-| `{direction}` | Transfer direction (based on LocalNetwork) | Incoming or Outgoing |
-| `{mediatype}` | Type of media | Flash |
-| `{mediaid}` | Media identifier | CN-123-456 |
-| `{counter}` | Sequential number for multiple transfers | 001 |
-| `{year}` | Current year | 2025 |
+| Token | Description | Example | Available In |
+|-------|-------------|---------|--------------|
+| `{date}` | Current date in format specified by DateFormat | 20250429 | Logging, Requests |
+| `{date:format}` | Custom format date | 2025-04-29 (with format yyyy-MM-dd) | Logging, Requests |
+| `{time}` | Current time in format specified by TimeFormat | 153045 | Logging, Requests |
+| `{time:format}` | Custom format time | 15:30:45 (with format HH:mm:ss) | Logging, Requests |
+| `{timestamp}` | Date and time combined | 20250429-153045 | Logging, Requests |
+| `{username}` | Current system user | Darren | Logging, Requests |
+| `{computername}` | Computer name | WORKSTATION-01 | Logging, Requests |
+| `{transfertype}` | Transfer type abbreviation | L2H | Logging only |
+| `{source}` | Source network/system | Intranet | Logging only |
+| `{destination}` | Destination network/system | Customer | Logging only |
+| `{direction}` | Transfer direction (based on LocalNetwork) | Incoming or Outgoing | Logging only |
+| `{mediatype}` | Type of media | Flash | Logging only |
+| `{mediaid}` | Media identifier | CN-123-456 | Logging only |
+| `{counter}` | Sequential number for multiple transfers/requests | 001 | Logging, Requests |
+| `{year}` | Current year | 2025 | Logging, Requests |
+
+**Note**: Request file naming uses a subset of these tokens since requests don't include transfer-specific details like media type, source/destination, or transfer direction.
 
 ### Customizing Date and Time Formats
 
@@ -266,11 +423,21 @@ TransferLogName = TransferLog_{year}.log
 FileListName = {date:yyyy-MM-dd}_{username}_{transfertype}_{source}-{destination}_CN{mediaid}.csv
 DateFormat = yyyyMMdd
 TimeFormat = HHmmss
+
+[Requests]
+OutputFolder = C:\TransferRequests
+EnableRequestLog = true
+RequestLogName = RequestLog_{year}.log
+FileListName = {date:yyyyMMdd}_{username}_Request_{counter}.csv
+DateFormat = yyyyMMdd
+TimeFormat = HHmmss
 ```
 
 This configuration would create:
-- A main log file named `TransferLog_2025.log` in the C:\TransferLogs directory
+- A main transfer log file named `TransferLog_2025.log` in the C:\TransferLogs directory
 - Individual transfer logs like `2025-04-29_Steve_L2H_Intranet-Customer_CN456.csv` for each transfer operation
+- A main request log file named `RequestLog_2025.log` in the C:\TransferRequests directory
+- Individual request files like `20250429_JohnDoe_Request_001.csv` for each request
 
 ### Applying Configuration Changes
 
@@ -280,6 +447,7 @@ For organizations deploying PyDTATransferLog to multiple systems, consider:
 1. Creating a standardized `config.ini` file with your organization's requirements
 2. Distributing this file with your application deployment
 3. Setting appropriate file permissions to prevent unauthorized modifications
+4. Configuring appropriate output directories for both transfer logs and file transfer requests
 
 ## Development
 
@@ -331,7 +499,8 @@ To develop for PyDTATransferLog, you'll need:
   - `utils/`: Utility functions
   - `resources/`: Application resources (icons, styles)
 - `tests/`: Unit and integration tests
-- `logs/`: Default directory for generated logs
+- `logs/`: Default directory for generated transfer logs
+- `requests/`: Default directory for generated file transfer requests
 - `build/`: Build artifacts (created during build process)
 - `dist/`: Distribution packages (created during build process)
 

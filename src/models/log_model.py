@@ -63,7 +63,7 @@ class TransferLog:
 
     def __init__(self, config, timestamp, transfer_date, username, computer_name,
                  media_type, media_id, transfer_type, source, destination, 
-                 file_count=0, total_size=0):
+                 request_id="", file_count=0, total_size=0):
         self.config = config
         self.log_dir = self.config.get("Logging", "OutputFolder", fallback="./logs")
         self.delimiter = self.config.get("Logging", "FileDelimiter", fallback="_")
@@ -78,6 +78,7 @@ class TransferLog:
         self.transfer_type = transfer_type
         self.source = source
         self.destination = destination
+        self.request_id = request_id
         self.file_count = file_count
         self.total_size = total_size
         self.files: List[FileInfo] = []

@@ -1,13 +1,166 @@
 import sys
 import os
 import argparse
-from PySide6.QtWidgets import QApplication
+import socket
+from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PySide6.QtCore import QDir
+from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
+from version import VERSION
+
+def is_console_available():
+    """Check if console output is available"""
+    try:
+        # Try to get console window handle on Windows
+        if sys.platform == "win32":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            return kernel32.GetConsoleWindow() != 0
+        else:
+            # On other platforms, check if stdout is a TTY
+            return sys.stdout.isatty()
+    except:
+        return False
+
+def create_gui_parser():
+    """Create the same argument parser used in GUI mode for help extraction"""
+    parser = argparse.ArgumentParser(
+        description="DTA File Transfer Log",
+        epilog="""
+For CLI mode help:
+  python main.py -t --help    (Transfer logging)
+  python main.py -r --help    (File requests)
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("-t", "--transfer", action="store_true", help="Transfer Log CLI mode")
+    parser.add_argument("-r", "--request", action="store_true", help="Request CLI mode")
+    parser.add_argument("--tab", help="Starting tab (0/1/2 or request/log/review)")
+    parser.add_argument("-V", "--version", action="version", version=VERSION)
+    return parser
+
+def generate_gui_help_content():
+    """Generate help content for GUI dialog from argparse parser"""
+    import io
+    import contextlib
+    
+    # Create parser and capture its help output
+    parser = create_gui_parser()
+    
+    # Capture the help text
+    help_buffer = io.StringIO()
+    with contextlib.redirect_stdout(help_buffer):
+        try:
+            parser.print_help()
+        except SystemExit:
+            pass  # argparse calls sys.exit after print_help
+    
+    help_text = help_buffer.getvalue()
+    
+    # Add GUI-specific notes at the end
+    gui_notes = """
+
+NOTES FOR GUI EXECUTABLE:
+    - This GUI executable (dtatransferlog.exe) is optimized for interactive use
+    - For command-line operations, use dtatransferlog-cli.exe instead
+    - The CLI executable provides full command-line functionality with console output
+    
+For detailed documentation, use Help > Documentation from the menu bar."""
+    
+    return help_text + gui_notes
+
+def show_gui_help():
+    """Show help information in a GUI dialog when console is not available"""
+    # Create a minimal QApplication if one doesn't exist
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    
+    # Create help dialog
+    dialog = QDialog()
+    dialog.setWindowTitle("PyDTATransferLog Help")
+    dialog.setModal(True)
+    dialog.resize(700, 500)
+    
+    layout = QVBoxLayout()
+    
+    # Get help content from actual argparse parser
+    help_content = generate_gui_help_content()
+    
+    # Text display
+    text_edit = QTextEdit()
+    text_edit.setPlainText(help_content)
+    text_edit.setReadOnly(True)
+    text_edit.setFont(QFont("Consolas", 9))  # Monospace font
+    layout.addWidget(text_edit)
+    
+    # Close button
+    button_layout = QHBoxLayout()
+    button_layout.addStretch()
+    close_button = QPushButton("Close")
+    close_button.clicked.connect(dialog.accept)
+    button_layout.addWidget(close_button)
+    layout.addLayout(button_layout)
+    
+    dialog.setLayout(layout)
+    dialog.exec()
+    
+    # Exit after showing help
+    sys.exit(0)
+
+def check_for_help_request():
+    """Check if help was requested and handle appropriately"""
+    # Check for help arguments
+    help_args = ['--help', '-h']
+    
+    for arg in sys.argv[1:]:
+        if arg.lower() in help_args:
+            # If we're frozen (executable) and no console available, show GUI help
+            if getattr(sys, 'frozen', False) and not is_console_available():
+                show_gui_help()
+                return True
+            # Otherwise, let argparse handle it normally
+            break
+    
+    return False
+
+def parse_tab_argument(tab_arg):
+    """Parse tab argument - accepts numbers (0/1/2) or names (case-insensitive)"""
+    if tab_arg is None or tab_arg.strip() == "":
+        return 0  # Default to Request tab
+    
+    # Try numeric first
+    if tab_arg.isdigit():
+        tab_num = int(tab_arg)
+        if 0 <= tab_num <= 2:
+            return tab_num
+    
+    # Try name mapping (case-insensitive)
+    tab_map = {
+        'request': 0,
+        'log': 1, 
+        'review': 2
+    }
+    
+    normalized_name = tab_arg.lower().strip()
+    if normalized_name in tab_map:
+        return tab_map[normalized_name]
+    
+    # Invalid input - show warning and default to Request tab
+    print(f"Warning: Invalid tab '{tab_arg}', defaulting to Request tab")
+    print("Valid options: 0/1/2 or request/log/review (case-insensitive)")
+    return 0  # Default to Request tab
 
 def main():
     """Main application entry point for GUI mode"""
+    # Check for help requests first (before doing anything else)
+    if check_for_help_request():
+        return
+    
+    # Store original working directory before changing it
+    original_cwd = os.getcwd()
+    
     # Set up working directory to be the location of the script/exe
     if getattr(sys, 'frozen', False):
         # Running as compiled exe
@@ -15,6 +168,19 @@ def main():
     else:
         # Running as script
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+    # Quick check for CLI modes before setting up GUI
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ["-t", "--transfer"]:
+            # Restore original working directory for CLI
+            os.chdir(original_cwd)
+            run_cli()
+            return
+        elif sys.argv[1] in ["-r", "--request"]:
+            # Restore original working directory for CLI
+            os.chdir(original_cwd)
+            run_request_cli()
+            return
 
     # Load configuration
     config = ConfigManager("config.ini")
@@ -44,20 +210,25 @@ def main():
         else:
             print(f"Warning: Theme '{theme}' specified in config.ini was not found.")
     
-    # Check command line args for review mode
-    parser = argparse.ArgumentParser(description="DTA File Transfer Log")
-    parser.add_argument("-r", "--review", action="store_true", help="Open in review mode")
-    parser.add_argument("-y", "--year", help="Year to review")
-    args, _ = parser.parse_known_args()
+    # Check command line args for review mode and show help for CLI modes
+    parser = create_gui_parser()
+    args = parser.parse_args()
     
     # Create the main application window with tabs
     window = DTATransferLogApp(config)
     
-    # If review mode specified, switch to review tab
-    if args.review:
-        window.tab_widget.setCurrentIndex(1)  # Switch to Review tab
-        if args.year and hasattr(window.review_tab, 'set_year'):
-            window.review_tab.set_year(args.year)
+    # Set the starting tab based on --tab argument or config default
+    if args.tab:
+        tab_index = parse_tab_argument(args.tab)
+    else:
+        # Check config for default tab
+        default_tab = config.get("UI", "DefaultTab", fallback="")
+        if default_tab:
+            tab_index = parse_tab_argument(default_tab)
+        else:
+            tab_index = 0  # Default to Request tab if no config setting
+    
+    window.tab_widget.setCurrentIndex(tab_index)
     
     window.show()
     sys.exit(app.exec())
@@ -94,7 +265,7 @@ def run_cli():
     parser.add_argument("--output", help="Log output folder")
     parser.add_argument("--sha256", action="store_true",
                         help="Include SHA-256 checksums")
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[2:])
 
     # Normalize transfer_type to short name
     if args.transfer_type in transfer_types:
@@ -215,8 +386,178 @@ def run_cli():
     print(f"File list saved: {file_list_path}")
     print(f"Successfully logged {len(all_files)} files")
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] in ["-c", "--cli"]:
-        run_cli()
+def run_request_cli():
+    """Command-line interface entry point for file transfer requests"""
+    # Store original working directory before changing it
+    original_cwd = os.getcwd()
+    
+    # Set up working directory
+    if getattr(sys, 'frozen', False):
+        # Running as compiled exe
+        os.chdir(os.path.dirname(sys.executable))
     else:
-        main()
+        # Running as script
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        
+    # Load configuration
+    config = ConfigManager("config.ini")
+
+    parser = argparse.ArgumentParser(description="DTA File Transfer Request CLI")
+    parser.add_argument("--requestor", required=True, help="Name of the person making the request")
+    parser.add_argument("--purpose", required=True, help="Purpose/justification for the request")
+    parser.add_argument("--request-date", help="Request date (MM/dd/yyyy format, defaults to today)")
+    parser.add_argument("--computer-name", help="Computer name (defaults to current hostname)")
+    parser.add_argument("--files", nargs="*", default=[], help="Files to include in request")
+    parser.add_argument("--folders", nargs="*", default=[],
+                        help="Folders to include in request (recursively)")
+    parser.add_argument("--output", help="Request output folder")
+    parser.add_argument("--sha256", action="store_true",
+                        help="Include SHA-256 checksums")
+    
+    args = parser.parse_args(sys.argv[2:])
+
+    # Validate and set defaults
+    requestor = args.requestor.strip()
+    if not requestor:
+        print("Error: Requestor name cannot be empty")
+        return
+
+    purpose = args.purpose.strip()
+    if not purpose:
+        print("Error: Purpose cannot be empty")
+        return
+
+    # Set request date
+    if args.request_date:
+        # Validate date format
+        try:
+            import datetime as dt
+            parsed_date = dt.datetime.strptime(args.request_date, "%m/%d/%Y")
+            request_date = args.request_date
+        except ValueError:
+            print("Error: Request date must be in MM/dd/yyyy format")
+            return
+    else:
+        import datetime as dt
+        request_date = dt.datetime.now().strftime("%m/%d/%Y")
+
+    # Set computer name
+    computer_name = args.computer_name if args.computer_name else socket.gethostname()
+
+    # Collect all files from --files and recursively from --folders
+    # Use original working directory for file resolution
+    all_files = []
+    for file in args.files:
+        # If path is relative, resolve it from original working directory
+        if not os.path.isabs(file):
+            file = os.path.join(original_cwd, file)
+        if os.path.isfile(file):
+            all_files.append(os.path.abspath(file))
+        else:
+            print(f"Warning: File not found: {file}")
+    
+    for folder in args.folders:
+        # If path is relative, resolve it from original working directory
+        if not os.path.isabs(folder):
+            folder = os.path.join(original_cwd, folder)
+        if os.path.isdir(folder):
+            from utils.file_utils import get_all_files
+            folder_files = get_all_files(folder)
+            all_files.extend(folder_files)
+        else:
+            print(f"Warning: Directory not found: {folder}")
+
+    if not all_files:
+        print("Error: No valid files specified")
+        return
+
+    # Create requests with the non-GUI approach
+    import datetime
+    from models.request_model import RequestLog
+
+    # Use output folder from args if provided, otherwise use config
+    request_output_folder = args.output if args.output else config.get("Requests", "OutputFolder", fallback="./requests")
+    os.makedirs(request_output_folder, exist_ok=True)
+    
+    # Create year subfolder for file list requests
+    year = datetime.datetime.now().strftime("%Y")
+    file_list_dir = os.path.join(request_output_folder, year)
+    os.makedirs(file_list_dir, exist_ok=True)
+
+    # Calculate total size of files
+    total_size = sum(os.path.getsize(file) for file in all_files if os.path.isfile(file))
+
+    # Create request log object
+    request_log = RequestLog(
+        config=config,
+        timestamp=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"),
+        request_date=request_date,
+        requestor=requestor,
+        computer_name=computer_name,
+        purpose=purpose,
+        file_count=len(all_files),
+        total_size=total_size
+    )
+
+    # Calculate file hashes if requested
+    file_hashes = {}
+    if args.sha256:
+        print("Calculating SHA-256 hashes...")
+        from utils.file_utils import calculate_file_hash
+        for i, file in enumerate(all_files):
+            try:
+                file_hashes[file] = calculate_file_hash(file)
+                if (i + 1) % 10 == 0 or i + 1 == len(all_files):
+                    print(f"Processed {i + 1}/{len(all_files)} files")
+            except Exception as e:
+                print(f"Error calculating hash for {file}: {str(e)}")
+                file_hashes[file] = f"ERROR: {str(e)}"
+
+    # Save file list using the request model's method
+    print("Generating request file list...")
+    
+    # Create a simple progress callback for CLI
+    def progress_callback_cli(progress):
+        if progress % 10 == 0:  # Print every 10%
+            print(f"Progress: {progress}%")
+    
+    # Create a simple cancellation callback (never canceled in CLI)
+    def is_canceled_callback():
+        return False
+    
+    # Use a mock progress signal for CLI
+    class MockProgressSignal:
+        def emit(self, value):
+            progress_callback_cli(value)
+    
+    mock_progress = MockProgressSignal()
+    
+    file_list_path = request_log._save_file_list_with_progress(
+        file_list_dir, all_files, file_hashes, mock_progress, is_canceled_callback)
+    
+    if not file_list_path:
+        print("Error: Failed to save request file list")
+        return
+
+    # Create the annual request log if enabled
+    enable_request_log = config.get("Requests", "EnableRequestLog", fallback="true").lower() == "true"
+    if enable_request_log:
+        print("Updating request log...")
+        request_log_name = config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
+        request_log_name = request_log_name.replace("{year}", year)
+        csv_file = os.path.join(request_output_folder, request_log_name)
+
+        # Format timestamp for CSV
+        ts = request_log.timestamp
+        formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
+
+        # Write to request log
+        request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
+        print(f"Request log updated: {csv_file}")
+
+    print(f"Request file list saved: {file_list_path}")
+    print(f"Successfully created request for {len(all_files)} files")
+    print(f"Total size: {request_log.format_total_size()}")
+
+if __name__ == "__main__":
+    main()
