@@ -74,6 +74,15 @@ jobs:
         shell: bash
         run: |
           PYTHON_CMD="python${{ env.PYTHON_VERSION }}"
+
+          # Ensure EPEL repository
+          if ! dnf repolist enabled | grep -q epel; then
+            echo "Installing EPEL repository..."
+            sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+          else
+            echo "EPEL repository is already available"
+          fi
+
           # Check if Python is already installed
           if ! command -v $PYTHON_CMD &> /dev/null; then
             echo "Installing Python ${{ env.PYTHON_VERSION }}..."
@@ -82,7 +91,7 @@ jobs:
             echo "Python ${{ env.PYTHON_VERSION }} is already installed"
           fi
           $PYTHON_CMD --version
-          
+
           # Create and activate virtual environment
           $PYTHON_CMD -m venv venv
           source venv/bin/activate
