@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict
 from constants import REQUEST_LOG_HEADERS, REQUEST_FILE_LIST_HEADERS
 from utils.file_utils import format_filename
+from utils.archive_utils import ArchiveProcessor
 
 
 @dataclass
@@ -106,36 +107,15 @@ class RequestLog:
             # Write headers
             writer.writerow(REQUEST_FILE_LIST_HEADERS)
             
-            # Process files with progress reporting
+            # Process files with progress reporting and archive processing
             total_files = len(selected_files)
             for i, file_path in enumerate(selected_files):
                 # Check if operation was canceled
                 if is_canceled_callback():
                     return ""
                 
-                try:
-                    # Get file info
-                    file_size = os.path.getsize(file_path)
-                    file_hash = file_hashes.get(file_path, "")
-                    
-                    # Write row (Level 0 for all files in request - no archive processing for requests)
-                    writer.writerow([
-                        "0",                    # Level
-                        "",                     # Container (empty for top-level files)
-                        file_path,              # FullName (complete path)
-                        str(file_size),         # Size
-                        file_hash               # File Hash
-                    ])
-                    
-                except Exception as e:
-                    # Write error row
-                    writer.writerow([
-                        "0",
-                        "",
-                        file_path,
-                        "ERROR",
-                        f"ERROR: {str(e)}"
-                    ])
+                # Process each file (including archive inspection)
+                self._process_file_for_request(writer, file_path, file_hashes, 0)
                 
                 # Update progress
                 try:
@@ -147,6 +127,18 @@ class RequestLog:
                     print(f"Progress update failed: {str(e)}")
         
         return file_list_path
+
+    def _process_file_for_request(self, writer, file_path, file_hashes, level, container_name=""):
+        """Process a file for the request, including archive contents if applicable"""
+        # Use the shared archive processor
+        ArchiveProcessor.process_file_with_archives(
+            writer, 
+            file_path, 
+            file_hashes, 
+            level,
+            container_name,
+            None  # no hash calculator for archive contents in requests
+        )
 
     def _save_request_log(self, csv_file, formatted_timestamp, file_list_path):
         """Save the request summary to the annual request log"""
