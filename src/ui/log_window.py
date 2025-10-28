@@ -424,6 +424,12 @@ class FileTransferLoggerTab(QWidget):
         # Add stretch in the middle to separate the button groups
         button_layout.addStretch()
 
+        import_request_btn = QPushButton("Import Request")
+        import_request_btn.clicked.connect(self.import_request_file)
+        import_request_btn.setFixedWidth(button_width)
+        import_request_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        button_layout.addWidget(import_request_btn)
+
         select_files_btn = QPushButton("Select Files")
         select_files_btn.clicked.connect(self.select_files)
         select_files_btn.setFixedWidth(button_width)
@@ -480,6 +486,7 @@ class FileTransferLoggerTab(QWidget):
         # Buttons tooltips
         clear_btn.setToolTip("Remove all files from the list")
         remove_selected_btn.setToolTip("Remove selected files from the list")
+        import_request_btn.setToolTip("Import file list from a request CSV file or plain text file (file paths only, no form data)")
         select_files_btn.setToolTip("Browse and select individual files")
         select_folders_btn.setToolTip("Browse and select entire folders. All files will be included recursively.")
 
@@ -492,6 +499,17 @@ class FileTransferLoggerTab(QWidget):
     def get_menu_actions(self):
         """Return actions for the menu when this tab is active"""
         actions = []
+
+        # Import Request
+        import_request_action = QAction("&Import Request...", self)
+        import_request_action.setShortcut("Ctrl+I")
+        import_request_action.triggered.connect(self.import_request_file)
+        actions.append(import_request_action)
+        
+        # Add separator
+        separator = QAction(self)
+        separator.setSeparator(True)
+        actions.append(separator)
 
         # Select Files
         select_files_action = QAction("&Select Files...", self)
@@ -711,6 +729,340 @@ class FileTransferLoggerTab(QWidget):
 
         self._update_file_stats()
         self.app.set_status_message(f"Removed {len(selected_items)} items")
+
+    def _remove_files_not_in_request(self, files_to_remove):
+        """Remove specific files from the selection by file path"""
+        removed_count = 0
+        
+        for file_path in files_to_remove:
+            if file_path in self.selected_files:
+                try:
+                    # Update total size
+                    self.total_size -= os.path.getsize(file_path)
+                except:
+                    pass
+                
+                # Remove from internal lists
+                self.selected_files.remove(file_path)
+                self.normalized_paths.remove(self._normalize_path(file_path))
+                
+                # Remove from UI list
+                for i in range(self.file_list.count()):
+                    item = self.file_list.item(i)
+                    if item and item.text() == file_path:
+                        self.file_list.takeItem(i)
+                        removed_count += 1
+                        break
+        
+        # Update file statistics
+        self._update_file_stats()
+        return removed_count
+
+    def import_request_file(self):
+        """Import files from a request CSV file or plain text file list"""
+        # Get the default request folder from config
+        request_folder = self.config.get("Requests", "OutputFolder", fallback="./requests")
+        
+        # Open file dialog to select request file or file list
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Request File or File List", 
+            request_folder,
+            "Request Files (*.csv);;Text Files (*.txt);;All files (*.*)"
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            self.app.set_status_message("Importing request file...")
+            
+            # Parse the request file and get file list
+            request_data, file_list = self._parse_request_file(file_path)
+            
+            if not file_list:
+                QMessageBox.warning(self, "Import Error", 
+                                   "Could not parse request file or no files found to import.")
+                return
+            
+            # Show request information for reference, but only import files
+            if request_data:
+                info_message = (
+                    f"Requestor: {request_data.get('requestor', 'N/A')}\n"
+                    f"Request Date: {request_data.get('request_date', 'N/A')}\n"
+                    f"Purpose: {request_data.get('purpose', 'N/A')}\n\n"
+                    f"Import {len(file_list)} files from this request?\n"
+                )
+            else:
+                info_message = (
+                    f"Import {len(file_list)} files from this request?\n\n"
+                    f"Note: No request metadata found, but files can still be imported."
+                )
+            
+            reply = QMessageBox.question(
+                self, 
+                "Import Request Files",
+                info_message,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.No:
+                return
+            
+            # Check if there are existing files not in the request
+            if self.selected_files:
+                request_file_paths = set()
+                for file_entry in file_list:
+                    file_path = file_entry.get('FullName', '')
+                    if file_path:
+                        # Normalize the request file path for comparison
+                        normalized_request_path = self._normalize_path(file_path)
+                        request_file_paths.add(normalized_request_path)
+                
+                # Find existing files not in the request
+                existing_not_in_request = []
+                for existing_file in self.selected_files:
+                    normalized_existing_path = self._normalize_path(existing_file)
+                    if normalized_existing_path not in request_file_paths:
+                        existing_not_in_request.append(existing_file)
+                
+                # Show warning if there are existing files not in the request
+                if existing_not_in_request:
+                    warning_message = (
+                        f"Warning: You have {len(existing_not_in_request)} existing file(s) selected that are NOT in this request:\n\n"
+                    )
+                    
+                    # Show first few files as examples with filename truncation
+                    max_filename_length = 50  # Reasonable limit for dialog width
+                    for existing_file in existing_not_in_request[:3]:
+                        filename = os.path.basename(existing_file)
+                        if len(filename) > max_filename_length:
+                            # Truncate in the middle to preserve file extension
+                            name, ext = os.path.splitext(filename)
+                            if len(ext) > 10:  # Very long extension, just truncate end
+                                truncated = filename[:max_filename_length-3] + "..."
+                            else:
+                                # Keep extension, truncate name in middle
+                                available_length = max_filename_length - len(ext) - 3  # 3 for "..."
+                                if available_length > 10:
+                                    truncated = name[:available_length] + "..." + ext
+                                else:
+                                    truncated = filename[:max_filename_length-3] + "..."
+                        else:
+                            truncated = filename
+                        warning_message += f"• {truncated}\n"
+                    
+                    if len(existing_not_in_request) > 3:
+                        warning_message += f"• ... and {len(existing_not_in_request) - 3} more\n"
+                    
+                    warning_message += (
+                        f"\nThese files will remain selected along with the {len(file_list)} request files.\n"
+                        f"This means your transfer will include files from multiple sources.\n\n"
+                        f"How would you like to proceed?"
+                    )
+                    
+                    # Create custom dialog with three options
+                    warning_dialog = QMessageBox(self)
+                    warning_dialog.setWindowTitle("Mixed File Sources Warning")
+                    warning_dialog.setText(warning_message)
+                    warning_dialog.setIcon(QMessageBox.Icon.Warning)
+                    
+                    # Add three buttons
+                    keep_all_btn = warning_dialog.addButton("Keep All", QMessageBox.ButtonRole.AcceptRole)
+                    remove_extra_btn = warning_dialog.addButton("Remove Files", QMessageBox.ButtonRole.ActionRole)
+                    cancel_btn = warning_dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+                    
+                    # Set tooltips for clarity
+                    keep_all_btn.setToolTip("Import request files and keep existing files (mixed sources)")
+                    remove_extra_btn.setToolTip("Remove existing files not in request, then import request files")
+                    cancel_btn.setToolTip("Cancel import and keep current file selection unchanged")
+                    
+                    # Set default button to the safest option
+                    warning_dialog.setDefaultButton(cancel_btn)
+                    
+                    # Show dialog and handle response
+                    warning_dialog.exec()
+                    clicked_button = warning_dialog.clickedButton()
+                    
+                    if clicked_button == cancel_btn:
+                        return  # Cancel import
+                    elif clicked_button == remove_extra_btn:
+                        # Remove files that are not in the request
+                        self._remove_files_not_in_request(existing_not_in_request)
+                        self.app.set_status_message(f"Removed {len(existing_not_in_request)} files not in request")
+                    # If keep_all_btn, just continue with import (no action needed)
+            
+            # Import files from the request
+            added_count = 0
+            missing_files = []
+            
+            for file_path_entry in file_list:
+                file_path = file_path_entry.get('FullName', '')
+                if file_path and os.path.exists(file_path):
+                    if self._add_file(file_path):
+                        added_count += 1
+                else:
+                    missing_files.append(file_path)
+            
+            # Update file statistics
+            self._update_file_stats()
+            
+            # Show results
+            message = f"Successfully imported {added_count} files from request."
+            if missing_files:
+                message += f"\n\nNote: {len(missing_files)} files from the request could not be found:"
+                for missing_file in missing_files[:5]:  # Show first 5 missing files
+                    message += f"\n• {missing_file}"
+                if len(missing_files) > 5:
+                    message += f"\n• ... and {len(missing_files) - 5} more"
+            
+            QMessageBox.information(self, "Import Complete", message)
+            self.app.set_status_message(f"Imported {added_count} files from request")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", f"Error importing request file:\n{str(e)}")
+            self.app.set_status_message(f"Error importing request: {str(e)}")
+
+    def _parse_request_file(self, file_path):
+        """Parse a request file (CSV or plain text) and return request data and file list"""
+        request_data = None
+        file_list = []
+        
+        # Detect file type by extension first, then by content if needed
+        file_extension = os.path.splitext(file_path)[1].lower()
+        
+        if file_extension == '.txt':
+            # Handle plain text file (one file path per line)
+            return self._parse_text_file_list(file_path)
+        elif file_extension == '.csv':
+            # Handle CSV file (original functionality)
+            return self._parse_csv_request_file(file_path)
+        else:
+            # Unknown extension - try to auto-detect by content
+            return self._parse_auto_detect_file(file_path)
+    
+    def _parse_auto_detect_file(self, file_path):
+        """Auto-detect file format and parse accordingly"""
+        try:
+            # Read first few lines to detect format
+            with open(file_path, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                if not first_line:
+                    return None, []
+                
+                # Check if first line looks like CSV headers
+                if ',' in first_line and any(header in first_line.upper() for header in ['LEVEL', 'FULLNAME', 'CONTAINER']):
+                    # Looks like a CSV file
+                    return self._parse_csv_request_file(file_path)
+                else:
+                    # Treat as text file
+                    return self._parse_text_file_list(file_path)
+                    
+        except Exception as e:
+            print(f"Error auto-detecting file format: {str(e)}")
+            # Default to text file parsing
+            return self._parse_text_file_list(file_path)
+    
+    def _parse_text_file_list(self, file_path):
+        """Parse a plain text file with one file path per line"""
+        request_data = None
+        file_list = []
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    original_line = line.rstrip('\r\n')
+                    file_path_entry = original_line.strip()
+                    
+                    # Skip empty lines and comments (lines starting with # or //)
+                    if not file_path_entry or file_path_entry.startswith(('#', '//')):
+                        continue
+                    
+                    # Handle quoted paths (remove surrounding quotes)
+                    if ((file_path_entry.startswith('"') and file_path_entry.endswith('"')) or
+                        (file_path_entry.startswith("'") and file_path_entry.endswith("'"))):
+                        file_path_entry = file_path_entry[1:-1]
+                    
+                    # Skip if still empty after quote removal
+                    if not file_path_entry:
+                        continue
+                    
+                    try:
+                        # Normalize the path
+                        normalized_path = os.path.normpath(os.path.abspath(file_path_entry))
+                        
+                        # Add to file list (using minimal structure compatible with existing code)
+                        file_list.append({
+                            'Level': '0',
+                            'Container': '',
+                            'FullName': normalized_path,
+                            'Size': '',
+                            'File Hash': ''
+                        })
+                    except Exception as path_error:
+                        print(f"Warning: Could not process path on line {line_num}: '{original_line}' - {str(path_error)}")
+                    
+        except Exception as e:
+            print(f"Error reading text file list: {str(e)}")
+            
+        return request_data, file_list
+    
+    def _parse_csv_request_file(self, file_path):
+        """Parse a CSV request file (original functionality)"""
+        request_data = None
+        file_list = []
+        
+        # Normalize the file path for comparison
+        normalized_file_path = os.path.normpath(os.path.abspath(file_path))
+        
+        # First, try to find the request log entry that corresponds to this file
+        request_log_dir = os.path.dirname(os.path.dirname(file_path))  # Go up two levels from year subfolder
+        year = datetime.datetime.now().strftime("%Y")
+        request_log_file = os.path.join(request_log_dir, f"RequestLog_{year}.log")
+        
+        # Look for the request log entry that references this file
+        if os.path.exists(request_log_file):
+            try:
+                with open(request_log_file, 'r', newline='', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        logged_file_path = row.get('File Log', '').strip()
+                        if logged_file_path:
+                            # Normalize the logged path for comparison
+                            normalized_logged_path = os.path.normpath(os.path.abspath(logged_file_path))
+                            if normalized_logged_path == normalized_file_path:
+                                request_data = {
+                                    'timestamp': row.get('Timestamp', ''),
+                                    'request_date': row.get('Request Date', ''),
+                                    'requestor': row.get('Requestor', ''),
+                                    'computer_name': row.get('Computer Name', ''),
+                                    'purpose': row.get('Purpose', ''),
+                                    'file_count': row.get('File Count', ''),
+                                    'total_size': row.get('Total Size', '')
+                                }
+                                break
+            except Exception as e:
+                print(f"Error reading request log: {str(e)}")
+        
+        # Parse the file list from the CSV (this should work regardless of metadata)
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Only include level 0 files (top-level files, not archive contents)
+                    if row.get('Level', '').strip() == '0':
+                        file_list.append({
+                            'Level': row.get('Level', ''),
+                            'Container': row.get('Container', ''),
+                            'FullName': row.get('FullName', ''),
+                            'Size': row.get('Size', ''),
+                            'File Hash': row.get('File Hash', '')
+                        })
+        except Exception as e:
+            print(f"Error reading request file list: {str(e)}")
+            
+        return request_data, file_list
 
     def log_transfer(self):
         # Collect validation errors
