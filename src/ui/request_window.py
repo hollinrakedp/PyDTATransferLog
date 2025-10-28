@@ -219,10 +219,20 @@ class RequestDropListWidget(QListWidget):
             painter.setPen(pen)
             painter.drawRect(5, 5, self.width() - 10, self.height() - 10)
 
-            # Draw hint text
+            # Draw text
+            font = painter.font()
+            font.setBold(True)
+            painter.setFont(font)
+
+            # Draw icon
+            icon_text = "📁➕"
             text = "Drag and drop files or folders here"
-            painter.setPen(Qt.gray)
-            painter.drawText(self.rect(), Qt.AlignCenter, text)
+
+            painter.drawText(
+                self.rect(),
+                Qt.AlignCenter,
+                f"{icon_text}\n\n{text}"
+            )
 
             painter.restore()
 

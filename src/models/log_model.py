@@ -1,11 +1,11 @@
 import os
 import csv
 import datetime
-import io
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Union, BinaryIO
+from typing import List, Optional, Dict
 from constants import FILE_LIST_HEADERS
 from utils.file_utils import format_filename
+from utils.archive_utils import ArchiveProcessor
 
 
 @dataclass
@@ -49,13 +49,6 @@ class FileInfo:
         if not container_path:
             return ""
         return os.path.basename(container_path)
-
-    def process_archive(self, archive_path, level, container_name=None):
-        """Process an archive file and get its contents"""
-        # When calling process_zip_file, process_tar_file, etc.
-        # Use the container filename only
-        container_filename = self.get_container_filename(
-            container_name or archive_path)
 
 
 class TransferLog:
@@ -336,26 +329,15 @@ class TransferLog:
                     checksum = file_hashes.get(
                         file_path, "") if file_hashes else ""
 
-                    # Write entry for the file itself (level 0)
-                    writer.writerow([
-                        "0",                                        # Level - 0 for regular files
-                        "",                                         # Container - empty for regular files
-                        self._normalize_path_separators(
-                            file_path),                             # Normalized path
-                        str(size),                                  # File size
-                        checksum                                    # File hash value (if available)
-                    ])
-
-                    # Process archives
-                    if file_path.lower().endswith('.zip'):
-                        self._process_zip_file(
-                            writer, file_path, 0, file_hashes)
-                    elif file_path.lower().endswith('.tar'):
-                        self._process_tar_file(
-                            writer, file_path, 0, file_hashes)
-                    elif file_path.lower().endswith('.gz'):
-                        self._process_gz_file(
-                            writer, file_path, 0, file_hashes)
+                    # Process archives using the shared archive processor
+                    ArchiveProcessor.process_file_with_archives(
+                        writer, 
+                        self._normalize_path_separators(file_path), 
+                        file_hashes, 
+                        0,  # level 0 for top-level files
+                        "",  # no container for top-level files
+                        None  # no hash calculator for archive contents
+                    )
 
         return file_list_path
 
@@ -409,33 +391,15 @@ class TransferLog:
                         return ""
 
                     if os.path.isfile(file_path):
-                        size = os.path.getsize(
-                            file_path) if os.path.exists(file_path) else ""
-                        checksum = file_hashes.get(
-                            file_path, "") if file_hashes else ""
-
-                        # Write entry for the file itself (level 0)
-                        writer.writerow([
-                            "0",                                         # Level - 0 for regular files
-                            "",                                          # Container - empty for regular files
-                            self._normalize_path_separators(
-                                file_path),  # Normalized path
-                            # File size
-                            str(size),
-                            # SHA256 hash (if available)
-                            checksum
-                        ])
-
-                        # Process archives
-                        if file_path.lower().endswith('.zip'):
-                            self._process_zip_file(
-                                writer, file_path, 0, file_hashes)
-                        elif file_path.lower().endswith('.tar'):
-                            self._process_tar_file(
-                                writer, file_path, 0, file_hashes)
-                        elif file_path.lower().endswith('.gz'):
-                            self._process_gz_file(
-                                writer, file_path, 0, file_hashes)
+                        # Use the shared archive processor
+                        ArchiveProcessor.process_file_with_archives(
+                            writer, 
+                            self._normalize_path_separators(file_path), 
+                            file_hashes, 
+                            0,  # level 0 for top-level files
+                            "",  # no container for top-level files
+                            None  # no hash calculator for archive contents
+                        )
 
                         # Report progress
                         if progress_signal:
@@ -452,162 +416,3 @@ class TransferLog:
                 except:
                     pass
             return ""
-
-    def _process_zip_file(self, writer, zip_path: Union[str, BinaryIO], level: int,
-                          file_hashes: Optional[Dict[str, str]] = None,
-                          container_name: Optional[str] = None):
-        """Process a ZIP file and write its contents to the log."""
-        import zipfile
-
-        try:
-            # Always use the provided container name if available
-            if container_name:
-                current_container = os.path.basename(container_name)
-            else:
-                current_container = os.path.basename(zip_path) if isinstance(
-                    zip_path, str) else "In-Memory ZIP"
-
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                for file_info in zip_ref.infolist():
-                    # Skip directories
-                    if file_info.is_dir():
-                        continue
-
-                    # Write entry for the file in the archive
-                    writer.writerow([
-                        str(level + 1),
-                        self._normalize_path_separators(current_container),
-                        self._normalize_path_separators(file_info.filename),
-                        str(file_info.file_size),  # Size
-                        ""                      # No hash for archived files
-                    ])
-
-                    # Handle nested archives
-                    if file_info.filename.lower().endswith('.zip'):
-                        with zip_ref.open(file_info.filename) as nested_file:
-                            nested_data = io.BytesIO(nested_file.read())
-                            self._process_zip_file(
-                                writer, nested_data, level + 1, file_hashes, file_info.filename)
-                    elif file_info.filename.lower().endswith('.tar'):
-                        with zip_ref.open(file_info.filename) as nested_file:
-                            nested_data = io.BytesIO(nested_file.read())
-                            self._process_tar_file(
-                                writer, nested_data, level + 1, file_hashes, file_info.filename)
-                    elif file_info.filename.lower().endswith('.gz'):
-                        with zip_ref.open(file_info.filename) as nested_file:
-                            nested_data = io.BytesIO(nested_file.read())
-                            self._process_gz_file(
-                                writer, nested_data, level + 1, file_hashes, file_info.filename)
-        except Exception as e:
-            # Log error but continue processing
-            print(f"Error processing ZIP file {zip_path}: {str(e)}")
-
-    def _process_tar_file(self, writer, tar_path: Union[str, BinaryIO], level: int,
-                          file_hashes: Optional[Dict[str, str]] = None,
-                          container_name: Optional[str] = None):
-        """Process a TAR file and write its contents to the log."""
-        import tarfile
-
-        try:
-            # Use basename for container name
-            if container_name:
-                current_container = os.path.basename(container_name)
-            else:
-                current_container = os.path.basename(tar_path) if isinstance(
-                    tar_path, str) else "In-Memory TAR"
-
-            # Handle both file paths and file-like objects
-            if isinstance(tar_path, str):
-                tar_ref = tarfile.open(tar_path, "r:*")
-            else:
-                tar_ref = tarfile.open(fileobj=tar_path, mode="r:*")
-
-            with tar_ref:
-                for member in tar_ref.getmembers():
-                    # Skip directories
-                    if not member.isfile():
-                        continue
-
-                    # Write entry for the file in the archive
-                    writer.writerow([
-                        str(level + 1),        # Level (increment from parent)
-                        current_container,     # Container (the tar file)
-                        member.name,           # Filename inside the archive
-                        str(member.size),      # Size
-                        ""                     # No hash for archived files
-                    ])
-
-                    # Handle nested archives
-                    if member.name.lower().endswith('.tar'):
-                        # Extract nested TAR to memory and process it
-                        extracted = tar_ref.extractfile(member)
-                        if extracted:
-                            nested_data = io.BytesIO(extracted.read())
-                            self._process_tar_file(
-                                writer, nested_data, level + 1, file_hashes, member.name)
-                    elif member.name.lower().endswith('.zip'):
-                        # Extract nested ZIP to memory and process it
-                        extracted = tar_ref.extractfile(member)
-                        if extracted:
-                            nested_data = io.BytesIO(extracted.read())
-                            self._process_zip_file(
-                                writer, nested_data, level + 1, file_hashes, member.name)
-                    elif member.name.lower().endswith('.gz'):
-                        # Extract nested GZ to memory and process it
-                        extracted = tar_ref.extractfile(member)
-                        if extracted:
-                            nested_data = io.BytesIO(extracted.read())
-                            self._process_gz_file(
-                                writer, nested_data, level + 1, file_hashes, member.name)
-        except Exception as e:
-            # Log error but continue processing
-            print(f"Error processing TAR file {tar_path}: {str(e)}")
-
-    def _process_gz_file(self, writer, gz_path: Union[str, BinaryIO, bytes], level: int,
-                         file_hashes: Optional[Dict[str, str]] = None,
-                         container_name: Optional[str] = None):
-        """Process a GZ file and write its contents to the log."""
-        import gzip
-
-        try:
-            # Use basename for container name
-            if container_name:
-                current_container = os.path.basename(container_name)
-            else:
-                current_container = os.path.basename(
-                    gz_path) if isinstance(gz_path, str) else "In-Memory GZ"
-
-            # Handle both file paths and file-like objects
-            if isinstance(gz_path, (str, bytes)):
-                gz_ref = gzip.open(gz_path, "rb")
-            else:
-                # Assume it's already a file-like object
-                gz_ref = gzip.GzipFile(fileobj=gz_path, mode="rb")
-
-            with gz_ref:
-                # Get the extracted filename by removing the .gz extension
-                extracted_name = current_container
-                if extracted_name.lower().endswith('.gz'):
-                    extracted_name = extracted_name[:-3]
-
-                # Read the content
-                content = gz_ref.read()
-                content_size = len(content)
-
-                # Write entry for the extracted file
-                writer.writerow([
-                    str(level + 1),      # Level (increment from parent)
-                    current_container,   # Container (the gz file)
-                    extracted_name,      # Filename without .gz
-                    str(content_size),   # Size of decompressed content
-                    ""                   # No hash for archived files
-                ])
-
-                # If the extracted file is a TAR file, process it recursively
-                if extracted_name.lower().endswith('.tar'):
-                    nested_data = io.BytesIO(content)
-                    self._process_tar_file(
-                        writer, nested_data, level + 1, file_hashes, extracted_name)
-        except Exception as e:
-            # Log error but continue processing
-            print(f"Error processing GZ file {gz_path}: {str(e)}")
