@@ -283,9 +283,12 @@ class TransferLog:
 
         return file_list_path
 
-    def _normalize_path_separators(self, path):
-        """Normalize path separators to forward slashes for consistent output"""
-        return path.replace('\\', '/')
+    def _format_display_path(self, path):
+        """Format path for CSV display using OS-native separators"""
+        try:
+            return os.path.normpath(os.path.abspath(path))
+        except Exception:
+            return path
 
     def _save_file_list(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save detailed file list with archive contents to CSV"""
@@ -314,26 +317,30 @@ class TransferLog:
                 break
             counter += 1
 
-        # Rest of method remains the same
+        normalized_hashes = None
+        if file_hashes:
+            try:
+                normalized_hashes = {
+                    os.path.normpath(os.path.abspath(k)): v
+                    for k, v in file_hashes.items()
+                }
+            except Exception:
+                normalized_hashes = file_hashes
+
         with open(file_list_path, 'w', newline='') as f:
             writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
             # Write header
-            writer.writerow(["Level", "Container", "FullName", "Size", "FileHash"])
+            writer.writerow(FILE_LIST_HEADERS)
 
             # Process each file
             for file_path in files:
                 if os.path.isfile(file_path):
-                    size = os.path.getsize(
-                        file_path) if os.path.exists(file_path) else ""
-                    checksum = file_hashes.get(
-                        file_path, "") if file_hashes else ""
-
                     # Process archives using the shared archive processor
                     ArchiveProcessor.process_file_with_archives(
-                        writer, 
-                        self._normalize_path_separators(file_path), 
-                        file_hashes, 
+                        writer,
+                        self._format_display_path(file_path),
+                        normalized_hashes,
                         0,  # level 0 for top-level files
                         "",  # no container for top-level files
                         None  # no hash calculator for archive contents
@@ -371,6 +378,17 @@ class TransferLog:
             counter += 1
 
         try:
+            # Prepare a normalized hash lookup
+            normalized_hashes = None
+            if file_hashes:
+                try:
+                    normalized_hashes = {
+                        os.path.normpath(os.path.abspath(k)): v
+                        for k, v in file_hashes.items()
+                    }
+                except Exception:
+                    normalized_hashes = file_hashes
+
             with open(file_list_path, 'w', newline='') as f:
                 writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
@@ -393,9 +411,9 @@ class TransferLog:
                     if os.path.isfile(file_path):
                         # Use the shared archive processor
                         ArchiveProcessor.process_file_with_archives(
-                            writer, 
-                            self._normalize_path_separators(file_path), 
-                            file_hashes, 
+                            writer,
+                            self._format_display_path(file_path),
+                            normalized_hashes,
                             0,  # level 0 for top-level files
                             "",  # no container for top-level files
                             None  # no hash calculator for archive contents
