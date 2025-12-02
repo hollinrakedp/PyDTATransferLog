@@ -551,18 +551,21 @@ class FileTransferLoggerTab(QWidget):
     def _add_file(self, file_path):
         """Add a file if it's not already in the selection"""
         try:
+            # Always work with absolute, OS-normalized paths for consistency/display
+            abs_display_path = os.path.normpath(os.path.abspath(file_path))
             normalized_path = self._normalize_path(file_path)
             if normalized_path not in self.normalized_paths:
                 try:
-                    file_size = os.path.getsize(file_path)
+                    file_size = os.path.getsize(abs_display_path)
                     self.total_size += file_size
                 except Exception:
                     # Handle files with access issues gracefully
                     pass
 
-                self.selected_files.append(file_path)
+                # Store and display the normalized absolute path
+                self.selected_files.append(abs_display_path)
                 self.normalized_paths.add(normalized_path)
-                self.file_list.addItem(file_path)
+                self.file_list.addItem(abs_display_path)
                 return True
             return False
         except Exception as e:
