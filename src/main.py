@@ -7,6 +7,12 @@ from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
 from version import VERSION
+from utils.cli_utils import (
+    resolve_output_folder,
+    collect_files,
+    compute_hashes,
+    format_timestamp,
+)
 
 def is_console_available():
     """Check if console output is available"""
@@ -277,20 +283,7 @@ def run_cli():
         transfer_type_abbr = args.transfer_type
 
     # Collect all files from --files and recursively from --folders
-    all_files = []
-    for file in args.files:
-        if os.path.isfile(file):
-            all_files.append(os.path.abspath(file))
-        else:
-            print(f"Warning: File not found: {file}")
-    
-    for folder in args.folders:
-        if os.path.isdir(folder):
-            from utils.file_utils import get_all_files
-            folder_files = get_all_files(folder)
-            all_files.extend(folder_files)
-        else:
-            print(f"Warning: Directory not found: {folder}")
+    all_files = collect_files(args.files, args.folders, original_cwd, print)
 
     if not all_files:
         print("Error: No valid files specified")
@@ -301,17 +294,12 @@ def run_cli():
     from models.log_model import TransferLog
 
     # Handle output folder - CLI args are relative to CWD, config defaults relative to app
-    if args.output:
-        # User specified --output
-        if os.path.isabs(args.output):
-            log_output_folder = args.output  # Absolute path
-        else:
-            # Make relative paths relative to the user CWD
-            log_output_folder = os.path.join(original_cwd, args.output)
-            log_output_folder = os.path.abspath(log_output_folder)
-    else:
-        # No --output specified
-        log_output_folder = config.get("Logging", "OutputFolder", fallback="./logs")
+    log_output_folder = resolve_output_folder(
+        args.output,
+        config.get("Logging", "OutputFolder", fallback="./logs"),
+        original_cwd,
+        config_dir,
+    )
     
     os.makedirs(log_output_folder, exist_ok=True)
     
@@ -343,15 +331,7 @@ def run_cli():
     file_hashes = {}
     if args.sha256:
         print("Calculating SHA-256 hashes...")
-        from utils.file_utils import calculate_file_hash
-        for i, file in enumerate(all_files):
-            try:
-                file_hashes[file] = calculate_file_hash(file)
-                if (i + 1) % 10 == 0 or i + 1 == len(all_files):
-                    print(f"Processed {i + 1}/{len(all_files)} files")
-            except Exception as e:
-                print(f"Error calculating hash for {file}: {str(e)}")
-                file_hashes[file] = f"ERROR: {str(e)}"
+        file_hashes = compute_hashes(all_files, algorithm='sha256', print_fn=print, progress_step=10)
 
     # Save file list
     print("Generating file list...")
@@ -366,8 +346,7 @@ def run_cli():
     csv_file = os.path.join(log_output_folder, f"TransferLog_{year}.log")
 
     # Format timestamp for CSV
-    ts = transfer_log.timestamp
-    formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
+    formatted_timestamp = format_timestamp(transfer_log.timestamp)
 
     # Format transfer data for CSV
     fields = [
@@ -380,6 +359,7 @@ def run_cli():
         transfer_log.transfer_type,
         transfer_log.source,
         transfer_log.destination,
+        "",  # Request ID not applicable in transfer CLI
         str(transfer_log.file_count),
         str(transfer_log.total_size),
         file_list_path
@@ -460,27 +440,7 @@ def run_request_cli():
     computer_name = args.computer_name if args.computer_name else socket.gethostname()
 
     # Collect all files from --files and recursively from --folders
-    # Use original working directory for file resolution
-    all_files = []
-    for file in args.files:
-        # If path is relative, resolve it from original working directory
-        if not os.path.isabs(file):
-            file = os.path.join(original_cwd, file)
-        if os.path.isfile(file):
-            all_files.append(os.path.abspath(file))
-        else:
-            print(f"Warning: File not found: {file}")
-    
-    for folder in args.folders:
-        # If path is relative, resolve it from original working directory
-        if not os.path.isabs(folder):
-            folder = os.path.join(original_cwd, folder)
-        if os.path.isdir(folder):
-            from utils.file_utils import get_all_files
-            folder_files = get_all_files(folder)
-            all_files.extend(folder_files)
-        else:
-            print(f"Warning: Directory not found: {folder}")
+    all_files = collect_files(args.files, args.folders, original_cwd, print)
 
     if not all_files:
         print("Error: No valid files specified")
@@ -491,16 +451,12 @@ def run_request_cli():
     from models.request_model import RequestLog
 
     # Use output folder from args if provided, otherwise use config
-    if args.output:
-        # User specified --output
-        if os.path.isabs(args.output):
-            request_output_folder = args.output  # Absolute path, use as-is
-        else:
-            # Make relative paths relative to the original CWD where user ran the command
-            request_output_folder = os.path.join(original_cwd, args.output)
-            request_output_folder = os.path.abspath(request_output_folder)
-    else:
-        request_output_folder = config.get("Requests", "OutputFolder", fallback="./requests")
+    request_output_folder = resolve_output_folder(
+        args.output,
+        config.get("Requests", "OutputFolder", fallback="./requests"),
+        original_cwd,
+        config_dir,
+    )
     os.makedirs(request_output_folder, exist_ok=True)
     
     # Create year subfolder for file list requests
@@ -527,15 +483,7 @@ def run_request_cli():
     file_hashes = {}
     if args.sha256:
         print("Calculating SHA-256 hashes...")
-        from utils.file_utils import calculate_file_hash
-        for i, file in enumerate(all_files):
-            try:
-                file_hashes[file] = calculate_file_hash(file)
-                if (i + 1) % 10 == 0 or i + 1 == len(all_files):
-                    print(f"Processed {i + 1}/{len(all_files)} files")
-            except Exception as e:
-                print(f"Error calculating hash for {file}: {str(e)}")
-                file_hashes[file] = f"ERROR: {str(e)}"
+        file_hashes = compute_hashes(all_files, algorithm='sha256', print_fn=print, progress_step=10)
 
     # Save file list using the request model's method
     print("Generating request file list...")
@@ -572,8 +520,7 @@ def run_request_cli():
         csv_file = os.path.join(request_output_folder, request_log_name)
 
         # Format timestamp for CSV
-        ts = request_log.timestamp
-        formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
+        formatted_timestamp = format_timestamp(request_log.timestamp)
 
         # Write to request log
         request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
