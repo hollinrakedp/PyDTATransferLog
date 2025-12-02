@@ -235,16 +235,20 @@ def main():
 
 def run_cli():
     """Command-line interface entry point"""
-    # Set up working directory
+    # Store original working directory for CLI output paths
+    original_cwd = os.getcwd()
+    
+    # Load configuration (change to app directory temporarily)
     if getattr(sys, 'frozen', False):
         # Running as compiled exe
-        os.chdir(os.path.dirname(sys.executable))
+        config_dir = os.path.dirname(sys.executable)
     else:
         # Running as script
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        
-    # Load configuration
-    config = ConfigManager("config.ini")
+        config_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Load config from app directory
+    config_path = os.path.join(config_dir, "config.ini")
+    config = ConfigManager(config_path)
     
     # Get transfer types from configuration
     transfer_types = config.get_transfer_types()
@@ -297,8 +301,19 @@ def run_cli():
     import datetime
     from models.log_model import TransferLog
 
-    # Use output folder from args if provided, otherwise use config
-    log_output_folder = args.output if args.output else config.get("Logging", "OutputFolder", fallback="./logs")
+    # Handle output folder - CLI args are relative to CWD, config defaults relative to app
+    if args.output:
+        # User specified --output
+        if os.path.isabs(args.output):
+            log_output_folder = args.output  # Absolute path
+        else:
+            # Make relative paths relative to the user CWD
+            log_output_folder = os.path.join(original_cwd, args.output)
+            log_output_folder = os.path.abspath(log_output_folder)
+    else:
+        # No --output specified
+        log_output_folder = config.get("Logging", "OutputFolder", fallback="./logs")
+    
     os.makedirs(log_output_folder, exist_ok=True)
     
     # Create year subfolder for file list logs
@@ -388,19 +403,20 @@ def run_cli():
 
 def run_request_cli():
     """Command-line interface entry point for file transfer requests"""
-    # Store original working directory before changing it
+    # Store original working directory for CLI output paths
     original_cwd = os.getcwd()
     
-    # Set up working directory
+    # Load configuration (change to app directory temporarily)
     if getattr(sys, 'frozen', False):
         # Running as compiled exe
-        os.chdir(os.path.dirname(sys.executable))
+        config_dir = os.path.dirname(sys.executable)
     else:
         # Running as script
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        
-    # Load configuration
-    config = ConfigManager("config.ini")
+        config_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Load config from app directory
+    config_path = os.path.join(config_dir, "config.ini")
+    config = ConfigManager(config_path)
 
     parser = argparse.ArgumentParser(description="DTA File Transfer Request CLI")
     parser.add_argument("--requestor", required=True, help="Name of the person making the request")
@@ -476,7 +492,16 @@ def run_request_cli():
     from models.request_model import RequestLog
 
     # Use output folder from args if provided, otherwise use config
-    request_output_folder = args.output if args.output else config.get("Requests", "OutputFolder", fallback="./requests")
+    if args.output:
+        # User specified --output
+        if os.path.isabs(args.output):
+            request_output_folder = args.output  # Absolute path, use as-is
+        else:
+            # Make relative paths relative to the original CWD where user ran the command
+            request_output_folder = os.path.join(original_cwd, args.output)
+            request_output_folder = os.path.abspath(request_output_folder)
+    else:
+        request_output_folder = config.get("Requests", "OutputFolder", fallback="./requests")
     os.makedirs(request_output_folder, exist_ok=True)
     
     # Create year subfolder for file list requests
