@@ -3,7 +3,6 @@ import os
 import argparse
 import socket
 from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
-from PySide6.QtCore import QDir
 from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
