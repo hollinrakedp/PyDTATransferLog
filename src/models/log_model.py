@@ -1,54 +1,11 @@
 import os
 import csv
 import datetime
-from dataclasses import dataclass
 from typing import List, Optional, Dict
 from constants import FILE_LIST_HEADERS
-from utils.file_utils import format_filename
+from utils.file_utils import FileInfo, format_filename, format_display_path
+from utils.file_list_writer import save_file_list_with_progress
 from utils.archive_utils import ArchiveProcessor
-
-
-@dataclass
-class FileInfo:
-    """Class for tracking file information"""
-    path: str
-    sha256: str = ""
-    size: Optional[int] = None
-
-    @property
-    def name(self) -> str:
-        """Get the file name"""
-        return os.path.basename(self.path)
-
-    @property
-    def directory(self) -> str:
-        """Get the directory containing the file"""
-        return os.path.dirname(self.path)
-
-    @property
-    def size_str(self) -> str:
-        """Get the file size as a string"""
-        if self.size is None:
-            try:
-                self.size = os.path.getsize(self.path)
-            except:
-                return ""
-
-        if self.size < 1024:
-            return f"{self.size} B"
-        elif self.size < 1024*1024:
-            return f"{self.size/1024:.2f} KB"
-        elif self.size < 1024*1024*1024:
-            return f"{self.size/(1024*1024):.2f} MB"
-        else:
-            return f"{self.size/(1024*1024*1024):.2f} GB"
-
-    @staticmethod
-    def get_container_filename(container_path):
-        """Extract just the filename portion of a container path"""
-        if not container_path:
-            return ""
-        return os.path.basename(container_path)
 
 
 class TransferLog:
@@ -283,13 +240,6 @@ class TransferLog:
 
         return file_list_path
 
-    def _format_display_path(self, path):
-        """Format path for CSV display using OS-native separators"""
-        try:
-            return os.path.normpath(os.path.abspath(path))
-        except Exception:
-            return path
-
     def _save_file_list(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save detailed file list with archive contents to CSV"""
         # Get filename template from config
@@ -339,7 +289,7 @@ class TransferLog:
                     # Process archives using the shared archive processor
                     ArchiveProcessor.process_file_with_archives(
                         writer,
-                        self._format_display_path(file_path),
+                        format_display_path(file_path),
                         normalized_hashes,
                         0,  # level 0 for top-level files
                         "",  # no container for top-level files
@@ -357,7 +307,7 @@ class TransferLog:
                              fallback="{timestamp}_{username}_{transfertype}_{source}-{destination}_FileList.csv")
         
         # Prepare data for token replacement
-        data = {
+        template_data = {
             'transfertype': self.transfer_type,
             'source': self.source,
             'destination': self.destination,
@@ -368,69 +318,16 @@ class TransferLog:
             'timestamp': self.timestamp
         }
         
-        # Find a unique filename using counter
-        counter = 1
-        while True:
-            file_list_filename = format_filename(template, data, self.config, counter)
-            file_list_path = os.path.join(log_dir, file_list_filename)
-            if not os.path.exists(file_list_path):
-                break
-            counter += 1
-
-        try:
-            # Prepare a normalized hash lookup
-            normalized_hashes = None
-            if file_hashes:
-                try:
-                    normalized_hashes = {
-                        os.path.normpath(os.path.abspath(k)): v
-                        for k, v in file_hashes.items()
-                    }
-                except Exception:
-                    normalized_hashes = file_hashes
-
-            with open(file_list_path, 'w', newline='') as f:
-                writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-
-                # Write header
-                writer.writerow(FILE_LIST_HEADERS)
-
-                # Process each file with progress updates
-                total_files = len(files)
-                for index, file_path in enumerate(files):
-                    # Check if operation is canceled
-                    if cancel_check and cancel_check():
-                        f.close()
-                        try:
-                            os.remove(file_list_path)
-                        except Exception as e:
-                            print(
-                                f"Error removing partial file on cancel: {str(e)}")
-                        return ""
-
-                    if os.path.isfile(file_path):
-                        # Use the shared archive processor
-                        ArchiveProcessor.process_file_with_archives(
-                            writer,
-                            self._format_display_path(file_path),
-                            normalized_hashes,
-                            0,  # level 0 for top-level files
-                            "",  # no container for top-level files
-                            None  # no hash calculator for archive contents
-                        )
-
-                        # Report progress
-                        if progress_signal:
-                            progress = int((index + 1) / total_files * 100)
-                            progress_signal.emit(progress)
-
-            return file_list_path
-        except Exception as e:
-            print(f"Error in _save_file_list_with_progress: {str(e)}")
-            # Clean up partial file if an error occurs
-            if os.path.exists(file_list_path):
-                try:
-                    os.remove(file_list_path)
-                except:
-                    pass
-            return ""
+        # Use shared file list writer
+        return save_file_list_with_progress(
+            output_dir=log_dir,
+            files=files,
+            file_hashes=file_hashes,
+            csv_headers=FILE_LIST_HEADERS,
+            filename_template=template,
+            template_data=template_data,
+            config=self.config,
+            progress_callback=progress_signal,
+            cancel_check=cancel_check,
+            path_formatter=format_display_path
+        )

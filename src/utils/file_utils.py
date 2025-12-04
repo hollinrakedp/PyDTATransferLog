@@ -3,6 +3,68 @@ import hashlib
 import re
 import datetime
 import socket
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class FileInfo:
+    """Class for tracking file information"""
+    path: str
+    sha256: str = ""
+    size: Optional[int] = None
+
+    @property
+    def name(self) -> str:
+        """Get the file name"""
+        return os.path.basename(self.path)
+
+    @property
+    def directory(self) -> str:
+        """Get the directory containing the file"""
+        return os.path.dirname(self.path)
+
+    @property
+    def size_str(self) -> str:
+        """Get the file size as a string"""
+        if self.size is None:
+            try:
+                self.size = os.path.getsize(self.path)
+            except:
+                return ""
+
+        if self.size < 1024:
+            return f"{self.size} B"
+        elif self.size < 1024*1024:
+            return f"{self.size/1024:.2f} KB"
+        elif self.size < 1024*1024*1024:
+            return f"{self.size/(1024*1024):.2f} MB"
+        else:
+            return f"{self.size/(1024*1024*1024):.2f} GB"
+
+    @staticmethod
+    def get_container_filename(container_path):
+        """Extract just the filename portion of a container path"""
+        if not container_path:
+            return ""
+        return os.path.basename(container_path)
+
+
+def format_display_path(path):
+    """
+    Format path for CSV display using OS-native separators.
+    
+    Args:
+        path: File path to normalize
+        
+    Returns:
+        Normalized absolute path with OS-native separators
+    """
+    try:
+        return os.path.normpath(os.path.abspath(path))
+    except Exception:
+        return path
+
 
 def get_all_files(directory):
     """
