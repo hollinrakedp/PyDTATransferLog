@@ -15,130 +15,7 @@ from utils.file_utils import calculate_file_hash, get_all_files
 from models.log_model import TransferLog
 from constants import TRANSFER_LOG_HEADERS
 from ui.widgets import DragDropFileListWidget
-
-
-class HashWorker(QThread):
-    """Worker thread for calculating file hashes"""
-    progress = Signal(int)
-    finished = Signal(dict)
-
-    def __init__(self, files):
-        super().__init__()
-        self.files = files
-        self.hashes = {}
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the hash operation"""
-        self.canceled = True
-
-    def run(self):
-        total = len(self.files)
-        for i, file in enumerate(self.files):
-            # Check if canceled
-            if self.canceled:
-                self.finished.emit({})
-                return
-
-            try:
-                self.hashes[file] = calculate_file_hash(file)
-                self.progress.emit(int((i + 1) / total * 100))
-            except Exception as e:
-                self.hashes[file] = f"ERROR: {str(e)}"
-        self.finished.emit(self.hashes)
-
-
-class FileProcessingWorker(QThread):
-    """Worker thread for processing files and archives"""
-    progress = Signal(int)
-    finished = Signal(str)
-
-    def __init__(self, transfer_log, files, file_hashes, base_log_dir, file_list_dir):
-        super().__init__()
-        self.transfer_log = transfer_log
-        self.files = files
-        self.file_hashes = file_hashes
-        self.base_log_dir = base_log_dir
-        self.file_list_dir = file_list_dir
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the file processing operation"""
-        self.canceled = True
-
-    def run(self):
-        # Check if already canceled
-        if self.canceled:
-            self.finished.emit("")
-            return
-
-        file_list_path = ""
-        try:
-            # Process the file list
-            if not self.canceled:
-                file_list_path = self.transfer_log._save_file_list_with_progress(
-                    self.file_list_dir, self.files, self.file_hashes, self.progress,
-                    lambda: self.canceled)
-
-            # Delete the file list if canceled
-            if self.canceled and file_list_path and os.path.exists(file_list_path):
-                try:
-                    os.remove(file_list_path)
-                    file_list_path = ""
-                except Exception as e:
-                    print(
-                        f"Error deleting file list after cancellation: {str(e)}")
-
-            # Create the annual transfer log
-            if file_list_path and not self.canceled:
-                year = datetime.datetime.now().strftime("%Y")
-                csv_file = os.path.join(
-                    self.base_log_dir, f"TransferLog_{year}.log")
-
-                # Format timestamp for CSV
-                ts = self.transfer_log.timestamp
-                formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-
-                # Format transfer data for CSV
-                fields = [
-                    formatted_timestamp,
-                    self.transfer_log.transfer_date,
-                    self.transfer_log.username,
-                    self.transfer_log.computer_name,
-                    self.transfer_log.media_type,
-                    self.transfer_log.media_id,
-                    self.transfer_log.transfer_type,
-                    self.transfer_log.source,
-                    self.transfer_log.destination,
-                    self.transfer_log.request_id,
-                    str(self.transfer_log.file_count),
-                    str(self.transfer_log.total_size),
-                    file_list_path
-                ]
-
-                # Write the log entry to the CSV file
-                file_exists = os.path.isfile(csv_file)
-                with open(csv_file, 'a', newline='') as f:
-                    writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-
-                    # Write headers if file is new
-                    if not file_exists:
-                        writer.writerow(TRANSFER_LOG_HEADERS)
-
-                    writer.writerow(fields)
-
-            # Signal completion
-            self.finished.emit(file_list_path)
-
-        except Exception as e:
-            print(f"Error in file processing worker: {str(e)}")
-            # If error occurs and we created a file list, try to delete it
-            if file_list_path and os.path.exists(file_list_path):
-                try:
-                    os.remove(file_list_path)
-                except:
-                    pass
-            self.finished.emit("")
+from ui.common_workers import FileHashWorker, FileProcessingWorker
 
 
 class FileTransferLoggerTab(QWidget):
@@ -1035,7 +912,7 @@ class FileTransferLoggerTab(QWidget):
             self.progress_dialog.show()
 
             # Create worker thread for checksums
-            self.hash_worker = HashWorker(self.selected_files)
+            self.hash_worker = FileHashWorker(self.selected_files)
             self.hash_worker.progress.connect(self.progress_dialog.setValue)
             self.hash_worker.finished.connect(
                 lambda hashes: self.start_file_processing(
@@ -1061,9 +938,43 @@ class FileTransferLoggerTab(QWidget):
             self.cancel_file_processing)
         self.file_progress_dialog.show()
 
+        # Create callback for saving transfer log
+        def save_transfer_log(base_dir, formatted_timestamp, file_list_path):
+            year = datetime.datetime.now().strftime("%Y")
+            csv_file = os.path.join(base_dir, f"TransferLog_{year}.log")
+            
+            # Format transfer data for CSV
+            fields = [
+                formatted_timestamp,
+                transfer_log.transfer_date,
+                transfer_log.username,
+                transfer_log.computer_name,
+                transfer_log.media_type,
+                transfer_log.media_id,
+                transfer_log.transfer_type,
+                transfer_log.source,
+                transfer_log.destination,
+                transfer_log.request_id,
+                str(transfer_log.file_count),
+                str(transfer_log.total_size),
+                file_list_path
+            ]
+            
+            # Write the log entry to the CSV file
+            file_exists = os.path.isfile(csv_file)
+            with open(csv_file, 'a', newline='') as f:
+                writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+                
+                # Write headers if file is new
+                if not file_exists:
+                    writer.writerow(TRANSFER_LOG_HEADERS)
+                
+                writer.writerow(fields)
+        
         # Create worker thread for file processing
         self.file_worker = FileProcessingWorker(
-            transfer_log, self.selected_files, hashes, base_log_dir, file_list_dir)
+            transfer_log, self.selected_files, hashes, base_log_dir, file_list_dir,
+            save_callback=save_transfer_log)
         self.file_worker.progress.connect(self.file_progress_dialog.setValue)
         self.file_worker.finished.connect(lambda file_path: self.complete_log_save(
             transfer_log, file_path))

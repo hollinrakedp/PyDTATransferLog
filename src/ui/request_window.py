@@ -15,100 +15,7 @@ from utils.file_utils import calculate_file_hash, get_all_files
 from models.request_model import RequestLog
 from constants import REQUEST_FILE_LIST_HEADERS
 from ui.widgets import DragDropFileListWidget
-
-
-class RequestHashWorker(QThread):
-    """Worker thread for calculating file hashes for requests"""
-    progress = Signal(int)
-    finished = Signal(dict)
-
-    def __init__(self, files):
-        super().__init__()
-        self.files = files
-        self.hashes = {}
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the hash operation"""
-        self.canceled = True
-
-    def run(self):
-        total = len(self.files)
-        for i, file in enumerate(self.files):
-            # Check if canceled
-            if self.canceled:
-                self.finished.emit({})
-                return
-
-            try:
-                self.hashes[file] = calculate_file_hash(file)
-                self.progress.emit(int((i + 1) / total * 100))
-            except Exception as e:
-                self.hashes[file] = f"ERROR: {str(e)}"
-        self.finished.emit(self.hashes)
-
-
-class RequestProcessingWorker(QThread):
-    """Worker thread for processing request files"""
-    progress = Signal(int)
-    finished = Signal(str)
-
-    def __init__(self, request_log, files, file_hashes, base_log_dir, file_list_dir):
-        super().__init__()
-        self.request_log = request_log
-        self.files = files
-        self.file_hashes = file_hashes
-        self.base_log_dir = base_log_dir
-        self.file_list_dir = file_list_dir
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the request processing operation"""
-        self.canceled = True
-
-    def run(self):
-        # Check if already canceled
-        if self.canceled:
-            self.finished.emit("")
-            return
-
-        file_list_path = ""
-        try:
-            # Process the file list
-            if not self.canceled:
-                file_list_path = self.request_log._save_file_list_with_progress(
-                    self.file_list_dir, self.files, self.file_hashes, self.progress,
-                    lambda: self.canceled)
-
-            # Delete the file list if canceled
-            if self.canceled and file_list_path and os.path.exists(file_list_path):
-                try:
-                    os.remove(file_list_path)
-                    file_list_path = ""
-                except Exception as e:
-                    print(f"Error deleting file list after cancellation: {str(e)}")
-
-            # Create the annual request log if enabled
-            if file_list_path and not self.canceled:
-                enable_request_log = self.request_log.config.get("Requests", "EnableRequestLog", fallback="true").lower() == "true"
-                if enable_request_log:
-                    year = datetime.datetime.now().strftime("%Y")
-                    request_log_name = self.request_log.config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
-                    request_log_name = request_log_name.replace("{year}", year)
-                    csv_file = os.path.join(self.base_log_dir, request_log_name)
-                    
-                    # Format timestamp for CSV
-                    ts = self.request_log.timestamp
-                    formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-                    
-                    # Write to request log
-                    self.request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
-
-        except Exception as e:
-            print(f"Error in request processing: {str(e)}")
-            file_list_path = ""
-
-        self.finished.emit(file_list_path)
+from ui.common_workers import FileHashWorker, FileProcessingWorker
 
 
 class FileTransferRequestTab(QWidget):
@@ -526,7 +433,7 @@ class FileTransferRequestTab(QWidget):
         progress_dialog.show()
 
         # Create and start hash worker
-        self.hash_worker = RequestHashWorker(self.selected_files)
+        self.hash_worker = FileHashWorker(self.selected_files)
         self.hash_worker.progress.connect(progress_dialog.setValue)
         self.hash_worker.finished.connect(
             lambda hashes: self._on_hashes_calculated(hashes, request_log, base_request_dir, file_list_dir, progress_dialog)
@@ -550,9 +457,22 @@ class FileTransferRequestTab(QWidget):
         progress_dialog.setMinimumDuration(0)
         progress_dialog.show()
 
+        # Create callback for saving annual request log (if enabled)
+        def save_request_log_callback(base_dir, formatted_timestamp, file_list_path):
+            enable_request_log = request_log.config.get("Requests", "EnableRequestLog", fallback="true").lower() == "true"
+            if enable_request_log:
+                year = datetime.datetime.now().strftime("%Y")
+                request_log_name = request_log.config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
+                request_log_name = request_log_name.replace("{year}", year)
+                csv_file = os.path.join(base_dir, request_log_name)
+                
+                # Write to request log
+                request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
+        
         # Create and start processing worker
-        self.processing_worker = RequestProcessingWorker(
-            request_log, self.selected_files, file_hashes, base_request_dir, file_list_dir)
+        self.processing_worker = FileProcessingWorker(
+            request_log, self.selected_files, file_hashes, base_request_dir, file_list_dir,
+            save_callback=save_request_log_callback)
         self.processing_worker.progress.connect(progress_dialog.setValue)
         self.processing_worker.finished.connect(lambda path: self._on_request_created(path, progress_dialog))
         progress_dialog.canceled.connect(self.processing_worker.cancel)
