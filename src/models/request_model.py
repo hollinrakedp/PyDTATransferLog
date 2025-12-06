@@ -6,29 +6,19 @@ from constants import REQUEST_LOG_HEADERS, REQUEST_FILE_LIST_HEADERS
 from utils.file_utils import FileInfo, format_filename, get_file_size_str
 from utils.file_list_writer import save_file_list_with_progress
 from utils.archive_utils import ArchiveProcessor
+from models.base_model import BaseLogModel
 
 
-class RequestLog:
+class RequestLog(BaseLogModel):
     """Class representing a file transfer request"""
 
     def __init__(self, config, timestamp, request_date, requestor, computer_name,
                  purpose, file_count=0, total_size=0):
-        self.config = config
+        super().__init__(config, timestamp, computer_name, file_count, total_size)
         self.request_dir = self.config.get("Requests", "OutputFolder", fallback="./requests")
-        self.timestamp = timestamp
         self.request_date = request_date
         self.requestor = requestor
-        self.computer_name = computer_name
         self.purpose = purpose
-        self.file_count = file_count
-        self.total_size = total_size
-        self.files: List[FileInfo] = []
-
-    def add_file(self, file_info: FileInfo):
-        """Add a file to the request"""
-        self.files.append(file_info)
-        # Update file count
-        self.file_count = len(self.files)
 
     def _save_file_list_with_progress(self, file_list_dir, selected_files, file_hashes, progress_callback, is_canceled_callback):
         """Save the file list CSV with progress reporting"""
@@ -80,7 +70,3 @@ class RequestLog:
                 str(self.total_size),
                 file_list_path
             ])
-
-    def format_total_size(self) -> str:
-        """Format the total size as a human-readable string"""
-        return get_file_size_str(self.total_size)

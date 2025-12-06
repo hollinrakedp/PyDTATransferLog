@@ -6,38 +6,28 @@ from constants import FILE_LIST_HEADERS
 from utils.file_utils import FileInfo, format_filename, format_display_path
 from utils.file_list_writer import save_file_list_with_progress
 from utils.archive_utils import ArchiveProcessor
+from models.base_model import BaseLogModel
 
 
-class TransferLog:
+class TransferLog(BaseLogModel):
     """Class representing a transfer log entry"""
 
     def __init__(self, config, timestamp, transfer_date, username, computer_name,
                  media_type, media_id, transfer_type, source, destination, 
                  request_id="", file_count=0, total_size=0):
-        self.config = config
+        super().__init__(config, timestamp, computer_name, file_count, total_size)
         self.log_dir = self.config.get("Logging", "OutputFolder", fallback="./logs")
         self.delimiter = self.config.get("Logging", "FileDelimiter", fallback="_")
         self.transfer_log_prefix = self.config.get("Logging", "TransferLogPrefix", fallback="DTATransferLog")
         self.file_list_prefix = self.config.get("Logging", "FileListPrefix", fallback="DTAFileList")
-        self.timestamp = timestamp
         self.transfer_date = transfer_date
         self.username = username
-        self.computer_name = computer_name
         self.media_type = media_type
         self.media_id = media_id
         self.transfer_type = transfer_type
         self.source = source
         self.destination = destination
         self.request_id = request_id
-        self.file_count = file_count
-        self.total_size = total_size
-        self.files: List[FileInfo] = []
-
-    def add_file(self, file_info: FileInfo):
-        """Add a file to the transfer log"""
-        self.files.append(file_info)
-        # Update file count
-        self.file_count = len(self.files)
 
     def save(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save the transfer log to CSV format with archive processing"""
