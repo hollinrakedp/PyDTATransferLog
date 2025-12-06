@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, QSize, QDate
 from PySide6.QtGui import QAction, QIcon
 from constants import TRANSFER_LOG_HEADERS
+from utils.file_utils import get_file_size_str
 
 
 class TransferLogReviewerTab(QWidget):
@@ -386,7 +387,7 @@ class TransferLogReviewerTab(QWidget):
                     for i, value in enumerate(row):
                         # Format size if we found a size column
                         if i == size_col_index and size_col_index >= 0:
-                            formatted_size = format_size(value)
+                            formatted_size = get_file_size_str(int(value) if value.isdigit() else 0)
                             detail_item.setText(i, formatted_size)
                             # Store original size for sorting
                             detail_item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
@@ -651,7 +652,7 @@ class TransferLogReviewerTab(QWidget):
             for i, value in enumerate(entry):
                 # Format total size column (index 10)
                 if i == 10:  # Total Size column
-                    formatted_size = format_size(value)
+                    formatted_size = get_file_size_str(int(value) if value.isdigit() else 0)
                     item.setText(i, formatted_size)
                     # Store original size for sorting
                     item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
@@ -687,17 +688,4 @@ class TransferLogReviewerTab(QWidget):
         self.app.set_status_message(f"Found {len(unique_values)} unique values for {TRANSFER_LOG_HEADERS[field_index]}")
 
 
-def format_size(size_bytes):
-    """Format a byte size as a human-readable string"""
-    try:
-        size_bytes = int(size_bytes)
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-    except (ValueError, TypeError):
-        return size_bytes
+

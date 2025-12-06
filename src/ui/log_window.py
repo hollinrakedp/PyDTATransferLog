@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QTreeWidgetItem, QCheckBox, QGroupBox, QSpacerItem)
 from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QIcon, QAction
-from utils.file_utils import calculate_file_hash, get_all_files
+from utils.file_utils import calculate_file_hash, get_all_files, get_file_size_str
 from models.log_model import TransferLog
 from constants import TRANSFER_LOG_HEADERS
 from ui.widgets import DragDropFileListWidget
@@ -401,20 +401,9 @@ class FileTransferLoggerTab(QWidget):
             except Exception as e:
                 self.app.set_status_message(f"Error opening file: {str(e)}")
 
-    def _format_size(self, size_bytes):
-        """Format file size in human-readable format"""
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024*1024:
-            return f"{size_bytes/1024:.2f} KB"
-        elif size_bytes < 1024*1024*1024:
-            return f"{size_bytes/(1024*1024):.2f} MB"
-        else:
-            return f"{size_bytes/(1024*1024*1024):.2f} GB"
-
     def _update_file_stats(self):
         """Update the file count and size display"""
-        size_str = self._format_size(self.total_size)
+        size_str = get_file_size_str(self.total_size)
         self.file_count_label.setText(
             f"Files: {len(self.selected_files)} | Size: {size_str}")
 

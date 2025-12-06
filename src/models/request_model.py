@@ -3,7 +3,7 @@ import csv
 import datetime
 from typing import List, Optional, Dict
 from constants import REQUEST_LOG_HEADERS, REQUEST_FILE_LIST_HEADERS
-from utils.file_utils import FileInfo, format_filename
+from utils.file_utils import FileInfo, format_filename, get_file_size_str
 from utils.file_list_writer import save_file_list_with_progress
 from utils.archive_utils import ArchiveProcessor
 
@@ -83,11 +83,4 @@ class RequestLog:
 
     def format_total_size(self) -> str:
         """Format the total size as a human-readable string"""
-        if self.total_size < 1024:
-            return f"{self.total_size} B"
-        elif self.total_size < 1024*1024:
-            return f"{self.total_size/1024:.2f} KB"
-        elif self.total_size < 1024*1024*1024:
-            return f"{self.total_size/(1024*1024):.2f} MB"
-        else:
-            return f"{self.total_size/(1024*1024*1024):.2f} GB"
+        return get_file_size_str(self.total_size)

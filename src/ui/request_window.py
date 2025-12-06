@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QTextEdit, QApplication)
 from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QIcon, QAction
-from utils.file_utils import calculate_file_hash, get_all_files
+from utils.file_utils import calculate_file_hash, get_all_files, get_file_size_str
 from models.request_model import RequestLog
 from constants import REQUEST_FILE_LIST_HEADERS
 from ui.widgets import DragDropFileListWidget
@@ -350,14 +350,7 @@ class FileTransferRequestTab(QWidget):
         self.file_count_label.setText(f"Files: {file_count}")
         
         # Format total size
-        if self.total_size < 1024:
-            size_str = f"{self.total_size} B"
-        elif self.total_size < 1024*1024:
-            size_str = f"{self.total_size/1024:.2f} KB"
-        elif self.total_size < 1024*1024*1024:
-            size_str = f"{self.total_size/(1024*1024):.2f} MB"
-        else:
-            size_str = f"{self.total_size/(1024*1024*1024):.2f} GB"
+        size_str = get_file_size_str(self.total_size)
         
         self.total_size_label.setText(f"Total Size: {size_str}")
         
