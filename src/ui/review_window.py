@@ -1,6 +1,5 @@
 import os
 import datetime
-import csv
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QComboBox, QPushButton, QSplitter, QTreeWidget,
                                QTreeWidgetItem, QLineEdit, QHeaderView,
@@ -9,6 +8,7 @@ from PySide6.QtCore import Qt, QSize, QDate
 from PySide6.QtGui import QAction, QIcon
 from constants import TRANSFER_LOG_HEADERS
 from utils.file_utils import get_file_size_str
+from models.review_model import ReviewModel
 
 
 class TransferLogReviewerTab(QWidget):
@@ -20,6 +20,7 @@ class TransferLogReviewerTab(QWidget):
 
         # Load configuration
         self.config = config
+        self.model = ReviewModel(config)
         self.log_dir = self.config.get(
             "Logging", "OutputFolder", fallback="./logs")
 
@@ -310,29 +311,11 @@ class TransferLogReviewerTab(QWidget):
         # Temporarily disable sorting for better performance
         self.log_tree.setSortingEnabled(False)
 
-        if not os.path.exists(self.log_dir):
-            self.app.set_status_message(f"Log directory {self.log_dir} not found")
-            return
+        # Load log data
+        self.all_log_entries = self.model.load_log_data(self.log_dir)
         
-        # Find all log files in the directory
-        log_files = []
-        for file in os.listdir(self.log_dir):
-            if file.endswith('.log'):
-                log_files.append(os.path.join(self.log_dir, file))
-        
-        if not log_files:
-            self.app.set_status_message("No log files found")
-            return
-
-        # Process all log files and collect entries
-        for log_file in log_files:
-            try:
-                with open(log_file, 'r', newline='') as f:
-                    reader = csv.reader(f)
-                    headers = next(reader)  # Skip header row
-                    self.all_log_entries.extend(list(reader))
-            except Exception as e:
-                self.app.set_status_message(f"Error loading {os.path.basename(log_file)}: {str(e)}")
+        if not self.all_log_entries:
+            self.app.set_status_message("No log files found or empty logs")
         
         # Apply filters
         self.apply_filters()
@@ -358,41 +341,34 @@ class TransferLogReviewerTab(QWidget):
         # Get file list path (last column)
         file_list_path = item.text(len(TRANSFER_LOG_HEADERS) - 1)
 
-        if not os.path.exists(file_list_path):
-            self.app.set_status_message(
-                f"File list {file_list_path} not found")
-            return
-
         # Load and display file list
         try:
-            with open(file_list_path, 'r', newline='') as f:
-                reader = csv.reader(f)
-                headers = next(reader)
-                
-                # Set the tree headers based on the actual file headers
-                self.details_tree.setHeaderLabels(headers)
-                
-                # Find the indices of special columns
-                size_col_index = -1
-                fullname_col_index = -1
-                for i, header in enumerate(headers):
-                    if header.lower() == "size":
-                        size_col_index = i
-                    elif header.lower() == "fullname":
-                        fullname_col_index = i
+            headers, rows = self.model.load_file_details(file_list_path)
+            
+            # Set the tree headers based on the actual file headers
+            self.details_tree.setHeaderLabels(headers)
+            
+            # Find the indices of special columns
+            size_col_index = -1
+            fullname_col_index = -1
+            for i, header in enumerate(headers):
+                if header.lower() == "size":
+                    size_col_index = i
+                elif header.lower() == "fullname":
+                    fullname_col_index = i
 
-                # Add data rows
-                for row in reader:
-                    detail_item = QTreeWidgetItem(self.details_tree)
-                    for i, value in enumerate(row):
-                        # Format size if we found a size column
-                        if i == size_col_index and size_col_index >= 0:
-                            formatted_size = get_file_size_str(int(value) if value.isdigit() else 0)
-                            detail_item.setText(i, formatted_size)
-                            # Store original size for sorting
-                            detail_item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
-                        else:
-                            detail_item.setText(i, value)
+            # Add data rows
+            for row in rows:
+                detail_item = QTreeWidgetItem(self.details_tree)
+                for i, value in enumerate(row):
+                    # Format size if we found a size column
+                    if i == size_col_index and size_col_index >= 0:
+                        formatted_size = get_file_size_str(int(value) if value.isdigit() else 0)
+                        detail_item.setText(i, formatted_size)
+                        # Store original size for sorting
+                        detail_item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
+                    else:
+                        detail_item.setText(i, value)
 
             # Update status
             self.app.set_status_message(
@@ -466,11 +442,8 @@ class TransferLogReviewerTab(QWidget):
             # Get column headers from the log tree
             headers = [self.log_tree.headerItem().text(i) for i in range(self.log_tree.columnCount())]
 
-            # Write filtered data to export file
-            with open(file_name, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(headers)  # Write headers
-                writer.writerows(self.filtered_entries)  # Write filtered data
+            # Write export data to file
+            self.model.export_data(file_name, headers, self.filtered_entries)
 
             self.app.set_status_message(
                 f"Exported {len(self.filtered_entries)} entries to {file_name}")
@@ -530,30 +503,15 @@ class TransferLogReviewerTab(QWidget):
 
     def apply_filters(self):
         """Apply all filters (date range, field/value, search) to the log entries"""
-        filtered = self.all_log_entries
-        
-        # Apply date range filter
-        if self.start_date_filter and self.end_date_filter:
-            # Transfer dates are typically in column 1 (index 1) in format MM/DD/YYYY
-            filtered = [
-                e for e in filtered if self._is_date_in_range(e[1], 
-                                                             self.start_date_filter, 
-                                                             self.end_date_filter)
-            ]
-        
-        # Apply field/value filter
-        if self.filter_field is not None and self.filter_value:
-            filtered = [
-                e for e in filtered if self.filter_value in e[self.filter_field]]
-        
-        # Apply search filter
-        if self.search_text:
-            text = self.search_text.lower()
-            filtered = [e for e in filtered if any(
-                text in field.lower() for field in e)]
-
-        # Store filtered results
-        self.filtered_entries = filtered
+        # Filter entries
+        self.filtered_entries = self.model.filter_entries(
+            self.all_log_entries,
+            start_date=self.start_date_filter,
+            end_date=self.end_date_filter,
+            field_index=self.filter_field,
+            filter_value=self.filter_value,
+            search_text=self.search_text
+        )
         
         # Update pagination
         self._update_pagination()
@@ -564,21 +522,6 @@ class TransferLogReviewerTab(QWidget):
         # Update status
         self.app.set_status_message(
             f"Showing {len(self.filtered_entries)} entries ({self.current_page}/{self.total_pages})")
-
-    def _is_date_in_range(self, date_str, start_date, end_date):
-        """Check if a date string is within the specified range"""
-        try:
-            # Convert MM/DD/YYYY to a date object for comparison
-            parts = date_str.split('/')
-            if len(parts) != 3:
-                return False
-                
-            month, day, year = map(int, parts)
-            date = QDate(year, month, day)
-            
-            return date >= start_date and date <= end_date
-        except (ValueError, TypeError):
-            return False
 
     def on_page_size_changed(self):
         """Handle change in entries per page"""
@@ -594,6 +537,7 @@ class TransferLogReviewerTab(QWidget):
             # Update page combo to match
             self.page_combo.setCurrentText(str(self.current_page))
             self._display_current_page()
+            self._update_button_states()
 
     def next_page(self):
         """Go to next page"""
@@ -602,14 +546,19 @@ class TransferLogReviewerTab(QWidget):
             # Update page combo to match
             self.page_combo.setCurrentText(str(self.current_page))
             self._display_current_page()
+            self._update_button_states()
+
+    def _update_button_states(self):
+        """Update enable/disable state of pagination buttons"""
+        self.prev_page_btn.setEnabled(self.current_page > 1)
+        self.next_page_btn.setEnabled(self.current_page < self.total_pages)
 
     def _update_pagination(self):
         """Update pagination controls based on filtered entries"""
-        if self.entries_per_page == "All":
-            self.total_pages = 1
-        else:
-            entries_per_page = int(self.entries_per_page)
-            self.total_pages = max(1, (len(self.filtered_entries) + entries_per_page - 1) // entries_per_page)
+        entries_per_page = -1 if self.entries_per_page == "All" else int(self.entries_per_page)
+        
+        # Calculate total pages
+        self.total_pages = self.model.calculate_total_pages(len(self.filtered_entries), entries_per_page)
         
         # Update page combo box
         self.page_combo.blockSignals(True)
@@ -628,8 +577,7 @@ class TransferLogReviewerTab(QWidget):
         self.page_combo.blockSignals(False)
         
         # Update previous/next buttons
-        self.prev_page_btn.setEnabled(self.current_page > 1)
-        self.next_page_btn.setEnabled(self.current_page < self.total_pages)
+        self._update_button_states()
 
     def _display_current_page(self):
         """Display the current page of log entries"""
@@ -638,16 +586,13 @@ class TransferLogReviewerTab(QWidget):
         if not self.filtered_entries:
             return
         
-        start_idx = 0
-        end_idx = len(self.filtered_entries)
+        entries_per_page = -1 if self.entries_per_page == "All" else int(self.entries_per_page)
         
-        if self.entries_per_page != "All":
-            entries_per_page = int(self.entries_per_page)
-            start_idx = (self.current_page - 1) * entries_per_page
-            end_idx = min(start_idx + entries_per_page, len(self.filtered_entries))
+        # Paginate entries
+        page_entries = self.model.paginate_entries(self.filtered_entries, self.current_page, entries_per_page)
         
         # Display the current page of entries
-        for entry in self.filtered_entries[start_idx:end_idx]:
+        for entry in page_entries:
             item = QTreeWidgetItem(self.log_tree)
             for i, value in enumerate(entry):
                 # Format total size column (index 10)
@@ -673,16 +618,11 @@ class TransferLogReviewerTab(QWidget):
         # Get the selected field index (adjusted for header offset)
         field_index = index - 1
         
-        # Collect all unique values for the selected field
-        unique_values = set()
-        for entry in self.all_log_entries:
-            if len(entry) > field_index:
-                value = entry[field_index]
-                if value:  # Skip empty values
-                    unique_values.add(value)
+        # Get unique values
+        unique_values = self.model.get_unique_values(self.all_log_entries, field_index)
         
         # Update the value filter dropdown
-        self.value_filter_combo.addItems(sorted(unique_values))
+        self.value_filter_combo.addItems(unique_values)
         
         # Make a nicer status message showing how many values were found
         self.app.set_status_message(f"Found {len(unique_values)} unique values for {TRANSFER_LOG_HEADERS[field_index]}")
