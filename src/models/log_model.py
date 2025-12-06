@@ -101,63 +101,16 @@ class TransferLog:
 
         return file_list_path
 
-    def _save_file_list(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
-        """Save detailed file list with archive contents to CSV"""
-        # Get filename template from config
-        template = self.config.get("Logging", "FileListName", 
-                             fallback="{timestamp}_{username}_{transfertype}_{source}-{destination}_FileList.csv")
+    def _save_file_list(self, log_dir: str, files: List[str],
+                        file_hashes: Optional[Dict[str, str]] = None,
+                        progress_signal=None, cancel_check=None) -> str:
+        """Save detailed file list with archive contents to CSV with optional progress reporting
         
-        # Prepare data for token replacement
-        data = {
-            'transfertype': self.transfer_type,
-            'source': self.source,
-            'destination': self.destination,
-            'mediatype': self.media_type,
-            'mediaid': self.media_id,
-            'username': self.username,
-            'computername': self.computer_name,
-            'timestamp': self.timestamp
-        }
-        
-        # Find a unique filename using counter
-        counter = 1
-        while True:
-            file_list_filename = format_filename(template, data, self.config, counter)
-            file_list_path = os.path.join(log_dir, file_list_filename)
-            if not os.path.exists(file_list_path):
-                break
-            counter += 1
-
-        normalized_hashes = None
-        if file_hashes:
-            try:
-                normalized_hashes = {
-                    os.path.normpath(os.path.abspath(k)): v
-                    for k, v in file_hashes.items()
-                }
-            except Exception:
-                normalized_hashes = file_hashes
-
-        with open(file_list_path, 'w', newline='') as f:
-            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-
-            # Write header
-            writer.writerow(FILE_LIST_HEADERS)
-
-            # Process each file
-            for file_path in files:
-                if os.path.isfile(file_path):
-                    # Process archives using the shared archive processor
-                    ArchiveProcessor.process_file_with_archives(
-                        writer,
-                        format_display_path(file_path),
-                        normalized_hashes,
-                        0,  # level 0 for top-level files
-                        "",  # no container for top-level files
-                        None  # no hash calculator for archive contents
-                    )
-
-        return file_list_path
+        This method supports both CLI (no progress) and GUI (with progress) usage.
+        For CLI usage, simply omit progress_signal and cancel_check parameters.
+        """
+        # Delegate to the unified method (kept as _save_file_list_with_progress for compatibility)
+        return self._save_file_list_with_progress(log_dir, files, file_hashes, progress_signal, cancel_check)
 
     def _save_file_list_with_progress(self, log_dir: str, files: List[str],
                                  file_hashes: Optional[Dict[str, str]] = None,
