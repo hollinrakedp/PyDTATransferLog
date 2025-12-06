@@ -3,6 +3,7 @@ import hashlib
 import re
 import datetime
 import socket
+import getpass
 from dataclasses import dataclass
 from typing import Optional
 
@@ -161,7 +162,7 @@ def format_filename(template, data=None, config=None, counter=1):
     # Base replacements (always available)
     now = datetime.datetime.now()
     replacements = {
-        'username': os.getlogin(),
+        'username': getpass.getuser(),
         'computername': socket.gethostname(),
         'counter': str(counter).zfill(3),
         'year': now.strftime("%Y"),

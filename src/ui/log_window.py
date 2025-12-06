@@ -4,6 +4,7 @@ import socket
 import sys
 import subprocess
 import csv
+import getpass
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QLineEdit, QComboBox, QPushButton,
                                QDateEdit, QFileDialog, QMessageBox, QListWidget,
@@ -72,7 +73,7 @@ class FileTransferLoggerTab(QWidget):
         username_label.setFixedWidth(label_width)
         username_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         username_layout.addWidget(username_label)
-        self.username_edit = QLineEdit(os.getlogin())
+        self.username_edit = QLineEdit(getpass.getuser())
         self.username_edit.setReadOnly(True)
         username_layout.addWidget(self.username_edit)
         left_layout.addLayout(username_layout)

@@ -3,6 +3,7 @@ import os
 import socket
 import subprocess
 import sys
+import getpass
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QLineEdit, QPushButton,
                                QDateEdit, QFileDialog, QMessageBox, QListWidget,
@@ -71,7 +72,7 @@ class FileTransferRequestTab(QWidget):
         requestor_label.setFixedWidth(label_width)
         requestor_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         requestor_layout.addWidget(requestor_label)
-        self.requestor_edit = QLineEdit(os.getlogin())
+        self.requestor_edit = QLineEdit(getpass.getuser())
         requestor_layout.addWidget(self.requestor_edit)
         left_layout.addLayout(requestor_layout)
 

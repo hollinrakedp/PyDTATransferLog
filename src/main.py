@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import socket
+import getpass
 from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
@@ -316,7 +317,7 @@ def run_cli():
         config=config,
         timestamp=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"),
         transfer_date=datetime.datetime.now().strftime("%m/%d/%Y"),
-        username=os.getlogin(),
+        username=getpass.getuser(),
         computer_name=socket.gethostname(),
         media_type=args.media_type,
         media_id=args.media_id,
