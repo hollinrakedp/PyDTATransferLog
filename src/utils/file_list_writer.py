@@ -88,7 +88,7 @@ def save_file_list_with_progress(
                     os.path.normpath(os.path.abspath(k)): v
                     for k, v in file_hashes.items()
                 }
-            except Exception:
+            except (OSError, ValueError, TypeError):
                 normalized_hashes = file_hashes
 
         with open(file_list_path, 'w', newline='', encoding='utf-8') as f:
@@ -140,6 +140,6 @@ def save_file_list_with_progress(
         if os.path.exists(file_list_path):
             try:
                 os.remove(file_list_path)
-            except:
-                pass
+            except OSError:
+                pass  # File cleanup failed, continue anyway
         return ""

@@ -309,7 +309,7 @@ class FileTransferLoggerTab(QWidget):
                 try:
                     file_size = os.path.getsize(abs_display_path)
                     self.total_size += file_size
-                except Exception:
+                except OSError:
                     # Handle files with access issues gracefully
                     pass
 
@@ -482,8 +482,8 @@ class FileTransferLoggerTab(QWidget):
                 try:
                     # Update total size
                     self.total_size -= os.path.getsize(file_path)
-                except:
-                    pass
+                except OSError:
+                    pass  # File may have been deleted or is inaccessible
                 
                 # Remove from internal lists
                 self.selected_files.remove(file_path)

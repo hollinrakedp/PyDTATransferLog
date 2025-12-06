@@ -298,7 +298,7 @@ class FileTransferRequestTab(QWidget):
             # Update total size
             try:
                 self.total_size += os.path.getsize(file_path)
-            except:
+            except OSError:
                 pass  # Ignore size calculation errors
             
             return True
@@ -327,8 +327,8 @@ class FileTransferRequestTab(QWidget):
                 self.total_size -= os.path.getsize(file_path)
                 if self.total_size < 0:
                     self.total_size = 0
-            except:
-                pass
+            except OSError:
+                pass  # File may have been deleted or is inaccessible
             
             # Remove from UI
             self.file_list.takeItem(current_row)

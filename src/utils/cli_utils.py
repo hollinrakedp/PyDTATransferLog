@@ -7,7 +7,7 @@ def format_timestamp(ts: str) -> str:
     """Format timestamp YYYYMMDD-HHMMSS to YYYY-MM-DD HH:MM:SS"""
     try:
         return f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-    except Exception:
+    except (IndexError, TypeError):
         return ts
 
 

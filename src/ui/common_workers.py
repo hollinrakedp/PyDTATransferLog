@@ -157,6 +157,6 @@ class FileProcessingWorker(QThread):
             if file_list_path and os.path.exists(file_list_path):
                 try:
                     os.remove(file_list_path)
-                except:
-                    pass
+                except OSError:
+                    pass  # File cleanup failed, continue anyway
             self.finished.emit("")

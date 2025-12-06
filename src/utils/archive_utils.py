@@ -90,7 +90,7 @@ class ArchiveProcessor:
                             try:
                                 with zip_ref.open(file_info) as archive_file:
                                     file_hash = hash_calculator(archive_file.read())
-                            except Exception:
+                            except (OSError, ValueError, KeyError):
                                 file_hash = ""  # Skip hash calculation if it fails
                         
                         # Write the file entry
@@ -108,14 +108,14 @@ class ArchiveProcessor:
                                 with zip_ref.open(file_info) as inner_file:
                                     ArchiveProcessor._process_zip_file(writer, inner_file, level + 1, 
                                                                      file_hashes, file_info.filename, hash_calculator)
-                            except Exception:
+                            except (OSError, ValueError, KeyError):
                                 pass  # Skip nested archives if they can't be processed
                         elif file_info.filename.lower().endswith(('.tar', '.tar.gz', '.tgz')):
                             try:
                                 with zip_ref.open(file_info) as inner_file:
                                     ArchiveProcessor._process_tar_file(writer, inner_file, level + 1, 
                                                                      file_hashes, file_info.filename, hash_calculator)
-                            except Exception:
+                            except (OSError, ValueError, KeyError):
                                 pass  # Skip nested archives if they can't be processed
                     
         except Exception as e:
@@ -155,7 +155,7 @@ class ArchiveProcessor:
                                 extracted_file = tar_ref.extractfile(member)
                                 if extracted_file:
                                     file_hash = hash_calculator(extracted_file.read())
-                            except Exception:
+                            except (OSError, ValueError):
                                 file_hash = ""  # Skip hash calculation if it fails
                         
                         # Write the file entry
@@ -174,7 +174,7 @@ class ArchiveProcessor:
                                 if inner_file:
                                     ArchiveProcessor._process_zip_file(writer, inner_file, level + 1, 
                                                                      file_hashes, member.name, hash_calculator)
-                            except Exception:
+                            except (OSError, ValueError):
                                 pass  # Skip nested archives if they can't be processed
                         elif member.name.lower().endswith(('.tar', '.tar.gz', '.tgz')):
                             try:
@@ -182,7 +182,7 @@ class ArchiveProcessor:
                                 if inner_file:
                                     ArchiveProcessor._process_tar_file(writer, inner_file, level + 1, 
                                                                      file_hashes, member.name, hash_calculator)
-                            except Exception:
+                            except (OSError, ValueError):
                                 pass  # Skip nested archives if they can't be processed
                     
         except Exception as e:
@@ -228,7 +228,7 @@ class ArchiveProcessor:
                 if hash_calculator:
                     try:
                         file_hash = hash_calculator(content)
-                    except Exception:
+                    except (ValueError, TypeError):
                         file_hash = ""  # Skip hash calculation if it fails
 
                 # Write the extracted file entry

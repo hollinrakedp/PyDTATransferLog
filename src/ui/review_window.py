@@ -577,7 +577,7 @@ class TransferLogReviewerTab(QWidget):
             date = QDate(year, month, day)
             
             return date >= start_date and date <= end_date
-        except Exception:
+        except (ValueError, TypeError):
             return False
 
     def on_page_size_changed(self):

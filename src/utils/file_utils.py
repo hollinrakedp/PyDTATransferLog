@@ -30,7 +30,7 @@ class FileInfo:
         if self.size is None:
             try:
                 self.size = os.path.getsize(self.path)
-            except:
+            except (OSError, ValueError):
                 return ""
 
         if self.size < 1024:
@@ -62,7 +62,7 @@ def format_display_path(path):
     """
     try:
         return os.path.normpath(os.path.abspath(path))
-    except Exception:
+    except (OSError, ValueError, TypeError):
         return path
 
 

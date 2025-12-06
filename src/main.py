@@ -25,7 +25,7 @@ def is_console_available():
         else:
             # On other platforms, check if stdout is a TTY
             return sys.stdout.isatty()
-    except:
+    except (AttributeError, OSError):
         return False
 
 def create_gui_parser():
