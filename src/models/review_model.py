@@ -113,6 +113,34 @@ class ReviewModel:
                     unique_values.add(value)
         return sorted(unique_values)
 
+    def sort_entries(self, entries: List[List[str]], column: int, reverse: bool = False) -> None:
+        """Sort entries in place based on column and order"""
+        
+        def sort_key(entry):
+            if len(entry) <= column:
+                return ""
+            
+            val = entry[column]
+            
+            # Handle specific columns
+            if column == 1:  # Transfer Date (MM/DD/YYYY)
+                try:
+                    parts = val.split('/')
+                    if len(parts) == 3:
+                        return datetime.date(int(parts[2]), int(parts[0]), int(parts[1]))
+                except (ValueError, IndexError):
+                    pass
+            elif column in [10, 11]:  # File Count, Total Size
+                try:
+                    return int(val)
+                except ValueError:
+                    return 0
+            
+            # Default string comparison (case-insensitive)
+            return val.lower()
+
+        entries.sort(key=sort_key, reverse=reverse)
+
     def paginate_entries(self, entries: List[List[str]], page: int, page_size: int) -> List[List[str]]:
         """Get a slice of entries for the current page"""
         if page_size <= 0: # "All" or invalid

@@ -38,6 +38,10 @@ class TransferLogReviewerTab(QWidget):
         self.start_date_filter = None
         self.end_date_filter = None
 
+        # Initialize sorting variables
+        self.sort_column = 0
+        self.sort_order = Qt.DescendingOrder
+
         # Set up UI
         self._setup_ui()
 
@@ -158,10 +162,16 @@ class TransferLogReviewerTab(QWidget):
         self.log_tree.header().setSectionResizeMode(QHeaderView.Interactive)
         self.log_tree.header().setStretchLastSection(False)
         self.log_tree.header().setMinimumSectionSize(80)
-        # Enable sorting
-        self.log_tree.setSortingEnabled(True)
-        # Initialize with sorting by date (column index typically 0-1)
-        self.log_tree.sortByColumn(1, Qt.DescendingOrder)
+        
+        # Disable built-in sorting to handle it manually (for pagination support)
+        self.log_tree.setSortingEnabled(False)
+        self.log_tree.header().setSectionsClickable(True)
+        self.log_tree.header().setSortIndicatorShown(True)
+        self.log_tree.header().sectionClicked.connect(self.on_header_clicked)
+        
+        # Initialize sort indicator
+        self.log_tree.header().setSortIndicator(self.sort_column, self.sort_order)
+        
         splitter.addWidget(self.log_tree)
 
         # Bottom pane: file details tree
@@ -308,20 +318,14 @@ class TransferLogReviewerTab(QWidget):
         self.details_tree.clear()
         self.all_log_entries = []
 
-        # Temporarily disable sorting for better performance
-        self.log_tree.setSortingEnabled(False)
-
         # Load log data
         self.all_log_entries = self.model.load_log_data(self.log_dir)
         
         if not self.all_log_entries:
             self.app.set_status_message("No log files found or empty logs")
         
-        # Apply filters
+        # Apply filters and display
         self.apply_filters()
-        
-        # Re-enable sorting after loading
-        self.log_tree.setSortingEnabled(True)
 
     def on_log_entry_selected(self):
         """Handle log entry selection"""
@@ -513,6 +517,13 @@ class TransferLogReviewerTab(QWidget):
             search_text=self.search_text
         )
         
+        # Apply current sort
+        self.model.sort_entries(
+            self.filtered_entries, 
+            self.sort_column, 
+            self.sort_order == Qt.DescendingOrder
+        )
+        
         # Update pagination
         self._update_pagination()
         
@@ -520,6 +531,46 @@ class TransferLogReviewerTab(QWidget):
         self._display_current_page()
         
         # Update status
+        self.app.set_status_message(
+            f"Showing {len(self.filtered_entries)} entries ({self.current_page}/{self.total_pages})")
+
+    def on_header_clicked(self, index):
+        """Handle header click for sorting"""
+        # If clicking the same column, toggle order
+        if index == self.sort_column:
+            if self.sort_order == Qt.AscendingOrder:
+                self.sort_order = Qt.DescendingOrder
+            else:
+                self.sort_order = Qt.AscendingOrder
+        else:
+            # New column, default to ascending
+            self.sort_column = index
+            # Default to descending for timestamp (0) and date (1), ascending for others
+            if index in [0, 1]:
+                self.sort_order = Qt.DescendingOrder
+            else:
+                self.sort_order = Qt.AscendingOrder
+        
+        # Update header indicator
+        self.log_tree.header().setSortIndicator(self.sort_column, self.sort_order)
+        
+        # Sort and refresh
+        self.sort_and_display()
+
+    def sort_and_display(self):
+        """Sort entries and refresh display"""
+        self.app.set_status_message("Sorting entries...")
+        
+        # Sort the filtered entries
+        self.model.sort_entries(
+            self.filtered_entries, 
+            self.sort_column, 
+            self.sort_order == Qt.DescendingOrder
+        )
+        
+        # Refresh display
+        self._display_current_page()
+        
         self.app.set_status_message(
             f"Showing {len(self.filtered_entries)} entries ({self.current_page}/{self.total_pages})")
 
