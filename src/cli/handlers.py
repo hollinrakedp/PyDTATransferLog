@@ -38,7 +38,7 @@ def run_cli():
     """Command-line interface entry point"""
     # Store original working directory for CLI output paths
     original_cwd = os.getcwd()
-    
+
     # Load configuration (change to app directory temporarily)
     if getattr(sys, 'frozen', False):
         # Running as compiled exe
@@ -46,14 +46,14 @@ def run_cli():
     else:
         # Running as script
         config_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     # Load config from app directory
     config_path = os.path.join(config_dir, "config.ini")
     config = ConfigManager(config_path)
-    
+
     # Get transfer types from configuration
     transfer_types = config.get_transfer_types()
-    
+
     # Build a set of all valid options (long and short)
     valid_transfer_types = set(transfer_types.keys()) | set(transfer_types.values())
 
@@ -72,12 +72,6 @@ def run_cli():
                         help="Include SHA-256 checksums")
     args = parser.parse_args(sys.argv[2:])
 
-    # Normalize transfer_type to short name
-    if args.transfer_type in transfer_types:
-        transfer_type_abbr = transfer_types[args.transfer_type]
-    else:
-        transfer_type_abbr = args.transfer_type
-
     # Collect all files from --files and recursively from --folders
     all_files = collect_files(args.files, args.folders, original_cwd, print)
 
@@ -92,9 +86,9 @@ def run_cli():
         original_cwd,
         config_dir,
     )
-    
+
     os.makedirs(log_output_folder, exist_ok=True)
-    
+
     # Create year subfolder for file list logs
     year = datetime.datetime.now().strftime("%Y")
     file_list_dir = os.path.join(log_output_folder, year)
@@ -128,7 +122,7 @@ def run_cli():
     # Save file list
     print("Generating file list...")
     file_list_path = transfer_log._save_file_list(file_list_dir, all_files, file_hashes)
-    
+
     if not file_list_path:
         print("Error: Failed to save file list")
         return
@@ -173,7 +167,7 @@ def run_request_cli():
     """Command-line interface entry point for file transfer requests"""
     # Store original working directory for CLI output paths
     original_cwd = os.getcwd()
-    
+
     # Load configuration (change to app directory temporarily)
     if getattr(sys, 'frozen', False):
         # Running as compiled exe
@@ -181,7 +175,7 @@ def run_request_cli():
     else:
         # Running as script
         config_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     # Load config from app directory
     config_path = os.path.join(config_dir, "config.ini")
     config = ConfigManager(config_path)
@@ -197,7 +191,7 @@ def run_request_cli():
     parser.add_argument("--output", help="Request output folder")
     parser.add_argument("--sha256", action="store_true",
                         help="Include SHA-256 checksums")
-    
+
     args = parser.parse_args(sys.argv[2:])
 
     # Validate and set defaults
@@ -241,7 +235,7 @@ def run_request_cli():
         config_dir,
     )
     os.makedirs(request_output_folder, exist_ok=True)
-    
+
     # Create year subfolder for file list requests
     year = datetime.datetime.now().strftime("%Y")
     file_list_dir = os.path.join(request_output_folder, year)
@@ -270,26 +264,26 @@ def run_request_cli():
 
     # Save file list using the request model's method
     print("Generating request file list...")
-    
+
     # Create a simple progress callback for CLI
     def progress_callback_cli(progress):
         if progress % 10 == 0:  # Print every 10%
             print(f"Progress: {progress}%")
-    
+
     # Create a simple cancellation callback (never canceled in CLI)
     def is_canceled_callback():
         return False
-    
+
     # Use a mock progress signal for CLI
     class MockProgressSignal:
         def emit(self, value):
             progress_callback_cli(value)
-    
+
     mock_progress = MockProgressSignal()
-    
+
     file_list_path = request_log._save_file_list_with_progress(
         file_list_dir, all_files, file_hashes, mock_progress, is_canceled_callback)
-    
+
     if not file_list_path:
         print("Error: Failed to save request file list")
         return

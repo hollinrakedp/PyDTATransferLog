@@ -19,7 +19,7 @@ class ArchiveProcessor:
                                  hash_calculator: Optional[Callable] = None):
         """
         Process a file and its archive contents if applicable.
-        
+
         Args:
             writer: CSV writer object
             file_path: Path to the file to process
@@ -32,7 +32,7 @@ class ArchiveProcessor:
             # Get file info
             file_size = os.path.getsize(file_path)
             file_hash = file_hashes.get(file_path, "") if file_hashes else ""
-            
+
             # Write the main file entry
             writer.writerow([
                 str(level),             # Level
@@ -41,7 +41,7 @@ class ArchiveProcessor:
                 str(file_size),         # Size
                 file_hash               # File Hash
             ])
-            
+
             # Check if this is an archive file and process its contents
             file_lower = file_path.lower()
             if file_lower.endswith('.zip'):
@@ -53,7 +53,7 @@ class ArchiveProcessor:
             elif file_lower.endswith('.gz') and not file_lower.endswith('.tar.gz'):
                 ArchiveProcessor._process_gz_file(writer, file_path, level + 1, 
                                                 file_hashes, file_path, hash_calculator)
-                
+
         except Exception as e:
             # Write error row
             writer.writerow([
@@ -92,7 +92,7 @@ class ArchiveProcessor:
                                     file_hash = hash_calculator(archive_file.read())
                             except (OSError, ValueError, KeyError):
                                 file_hash = ""  # Skip hash calculation if it fails
-                        
+
                         # Write the file entry
                         writer.writerow([
                             str(level),
@@ -117,7 +117,7 @@ class ArchiveProcessor:
                                                                      file_hashes, file_info.filename, hash_calculator)
                             except (OSError, ValueError, KeyError):
                                 pass  # Skip nested archives if they can't be processed
-                    
+
         except Exception as e:
             # Log error but continue processing
             print(f"Error processing ZIP file {zip_path}: {str(e)}")
@@ -157,7 +157,7 @@ class ArchiveProcessor:
                                     file_hash = hash_calculator(extracted_file.read())
                             except (OSError, ValueError):
                                 file_hash = ""  # Skip hash calculation if it fails
-                        
+
                         # Write the file entry
                         writer.writerow([
                             str(level),
@@ -172,7 +172,7 @@ class ArchiveProcessor:
                             try:
                                 inner_file = tar_ref.extractfile(member)
                                 if inner_file:
-                                    ArchiveProcessor._process_zip_file(writer, inner_file, level + 1, 
+                                    ArchiveProcessor._process_zip_file(writer, inner_file, level + 1,
                                                                      file_hashes, member.name, hash_calculator)
                             except (OSError, ValueError):
                                 pass  # Skip nested archives if they can't be processed
@@ -180,11 +180,11 @@ class ArchiveProcessor:
                             try:
                                 inner_file = tar_ref.extractfile(member)
                                 if inner_file:
-                                    ArchiveProcessor._process_tar_file(writer, inner_file, level + 1, 
+                                    ArchiveProcessor._process_tar_file(writer, inner_file, level + 1,
                                                                      file_hashes, member.name, hash_calculator)
                             except (OSError, ValueError):
                                 pass  # Skip nested archives if they can't be processed
-                    
+
         except Exception as e:
             # Log error but continue processing
             print(f"Error processing TAR file {tar_path}: {str(e)}")
@@ -222,7 +222,7 @@ class ArchiveProcessor:
                 # Read the content to get size and optionally calculate hash
                 content = gz_ref.read()
                 content_size = len(content)
-                
+
                 # Calculate hash if hash_calculator is provided
                 file_hash = ""
                 if hash_calculator:

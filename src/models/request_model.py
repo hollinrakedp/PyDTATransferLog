@@ -19,9 +19,9 @@ class RequestLog(BaseLogModel):
     def _save_file_list_with_progress(self, file_list_dir, selected_files, file_hashes, progress_callback, is_canceled_callback):
         """Save the file list CSV with progress reporting"""
         # Get filename template from config
-        template = self.config.get("Requests", "FileListName", 
+        template = self.config.get("Requests", "FileListName",
                                   fallback="{date:yyyyMMdd}_{username}_Request_{counter}.csv")
-        
+
         # Prepare data for token replacement
         template_data = {
             'username': self.requestor,
@@ -29,7 +29,7 @@ class RequestLog(BaseLogModel):
             'requestor': self.requestor,
             'purpose': self.purpose
         }
-        
+
         # Use shared file list writer
         return save_file_list_with_progress(
             output_dir=file_list_dir,

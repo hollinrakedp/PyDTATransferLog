@@ -16,7 +16,7 @@ class ReviewModel:
 
         if not os.path.exists(log_dir):
             return []
-        
+
         # Find all log files in the directory
         log_files = []
         try:
@@ -25,7 +25,7 @@ class ReviewModel:
                     log_files.append(os.path.join(log_dir, file))
         except OSError:
             return []
-        
+
         if not log_files:
             return []
 
@@ -42,7 +42,7 @@ class ReviewModel:
             except Exception:
                 # Skip bad files
                 continue
-        
+
         return all_log_entries
 
     def load_file_details(self, file_list_path: str) -> Tuple[List[str], List[List[str]]]:
@@ -67,19 +67,19 @@ class ReviewModel:
                        search_text: Optional[str] = None) -> List[List[str]]:
         """Apply filters to log entries"""
         filtered = entries
-        
+
         # Apply date range filter
         if start_date and end_date:
             # Transfer dates are typically in column 1 (index 1) in format MM/DD/YYYY
             filtered = [
                 e for e in filtered if len(e) > 1 and self._is_date_in_range(e[1], start_date, end_date)
             ]
-        
+
         # Apply field/value filter
         if field_index is not None and filter_value:
             filtered = [
                 e for e in filtered if len(e) > field_index and filter_value in e[field_index]]
-        
+
         # Apply search filter
         if search_text:
             text = search_text.lower()
@@ -95,10 +95,10 @@ class ReviewModel:
             parts = date_str.split('/')
             if len(parts) != 3:
                 return False
-                
+
             month, day, year = map(int, parts)
             date = QDate(year, month, day)
-            
+
             return date >= start_date and date <= end_date
         except (ValueError, TypeError):
             return False
@@ -115,13 +115,13 @@ class ReviewModel:
 
     def sort_entries(self, entries: List[List[str]], column: int, reverse: bool = False) -> None:
         """Sort entries in place based on column and order"""
-        
+
         def sort_key(entry):
             if len(entry) <= column:
                 return ""
-            
+
             val = entry[column]
-            
+
             # Handle specific columns
             if column == 1:  # Transfer Date (MM/DD/YYYY)
                 try:
@@ -135,7 +135,7 @@ class ReviewModel:
                     return int(val)
                 except ValueError:
                     return 0
-            
+
             # Default string comparison (case-insensitive)
             return val.lower()
 
@@ -145,7 +145,7 @@ class ReviewModel:
         """Get a slice of entries for the current page"""
         if page_size <= 0: # "All" or invalid
             return entries
-            
+
         start_idx = (page - 1) * page_size
         end_idx = min(start_idx + page_size, len(entries))
         return entries[start_idx:end_idx]

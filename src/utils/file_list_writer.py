@@ -27,7 +27,7 @@ def save_file_list_with_progress(
 ) -> str:
     """
     Save a detailed file list CSV with progress reporting and archive processing.
-    
+
     Args:
         output_dir: Directory where the CSV file will be created
         files: List of file paths to include in the CSV
@@ -41,10 +41,10 @@ def save_file_list_with_progress(
         cancel_check: Optional callback that returns True if operation should be canceled
         path_formatter: Optional function to format file paths for display
                        Defaults to format_display_path if None
-    
+
     Returns:
         str: Path to the created CSV file, or empty string on error/cancellation
-    
+
     Notes:
         - Uses format_filename() for consistent token replacement
         - Automatically finds next available counter value
@@ -55,14 +55,14 @@ def save_file_list_with_progress(
     # Use default path formatter if none provided
     if path_formatter is None:
         path_formatter = format_display_path
-    
+
     # Find a unique filename using counter
     counter = 1
     while True:
         file_list_filename = format_filename(
-            filename_template, 
-            template_data, 
-            config, 
+            filename_template,
+            template_data,
+            config,
             counter
         )
         file_list_path = os.path.join(output_dir, file_list_filename)
@@ -71,9 +71,9 @@ def save_file_list_with_progress(
         counter += 1
         if counter > 999:  # Prevent infinite loop
             file_list_filename = format_filename(
-                filename_template, 
-                template_data, 
-                config, 
+                filename_template,
+                template_data,
+                config,
                 999
             )
             file_list_path = os.path.join(output_dir, file_list_filename)
@@ -112,7 +112,7 @@ def save_file_list_with_progress(
                 if os.path.isfile(file_path):
                     # Format the path for display
                     display_path = path_formatter(file_path)
-                    
+
                     # Use the shared archive processor
                     ArchiveProcessor.process_file_with_archives(
                         writer,

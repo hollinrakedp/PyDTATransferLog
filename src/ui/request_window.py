@@ -136,7 +136,7 @@ class FileTransferRequestTab(QWidget):
         button_layout = QHBoxLayout()
 
         button_width = 120  # Width that accommodates "Remove Selected" with padding
-        
+
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_selected_files)
         clear_btn.setFixedWidth(button_width)
@@ -148,7 +148,7 @@ class FileTransferRequestTab(QWidget):
         remove_selected_btn.setFixedWidth(button_width)
         remove_selected_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         button_layout.addWidget(remove_selected_btn)
-        
+
         # Add stretch in the middle to separate the button groups
         button_layout.addStretch()
 
@@ -244,13 +244,13 @@ class FileTransferRequestTab(QWidget):
         """Open file dialog to select files"""
         files, _ = QFileDialog.getOpenFileNames(
             self, "Select Files to Request", "", "All Files (*)")
-        
+
         if files:
             added_count = 0
             for file_path in files:
                 if self._add_file(file_path):
                     added_count += 1
-            
+
             self._update_file_stats()
             if added_count > 0:
                 self.app.set_status_message(f"Added {added_count} files to request")
@@ -258,17 +258,17 @@ class FileTransferRequestTab(QWidget):
     def select_folder(self):
         """Open folder dialog to select a folder and add all files"""
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
-        
+
         if folder:
             self.app.set_status_message(f"Scanning folder: {folder}")
-            
+
             try:
                 files = get_all_files(folder)
                 added_count = 0
                 for file_path in files:
                     if self._add_file(file_path):
                         added_count += 1
-                
+
                 self._update_file_stats()
                 self.app.set_status_message(f"Added {added_count} files from folder")
             except Exception as e:
@@ -280,7 +280,7 @@ class FileTransferRequestTab(QWidget):
         try:
             # Normalize the path for comparison
             normalized_path = self._normalize_path(file_path)
-            
+
             # Check if file already exists in the list
             if normalized_path in self.normalized_paths:
                 return False
@@ -292,16 +292,16 @@ class FileTransferRequestTab(QWidget):
             # Add to lists
             self.selected_files.append(file_path)
             self.normalized_paths.add(normalized_path)
-            
+
             # Add to UI list
             self.file_list.addItem(file_path)
-            
+
             # Update total size
             try:
                 self.total_size += os.path.getsize(file_path)
             except OSError:
                 pass  # Ignore size calculation errors
-            
+
             return True
         except Exception as e:
             self.app.set_status_message(f"Error adding file {file_path}: {str(e)}")
@@ -317,12 +317,12 @@ class FileTransferRequestTab(QWidget):
         if current_row >= 0:
             # Get the file path
             file_path = self.selected_files[current_row]
-            
+
             # Remove from data structures
             self.selected_files.pop(current_row)
             normalized_path = self._normalize_path(file_path)
             self.normalized_paths.discard(normalized_path)
-            
+
             # Update total size
             try:
                 self.total_size -= os.path.getsize(file_path)
@@ -330,10 +330,10 @@ class FileTransferRequestTab(QWidget):
                     self.total_size = 0
             except OSError:
                 pass  # File may have been deleted or is inaccessible
-            
+
             # Remove from UI
             self.file_list.takeItem(current_row)
-            
+
             # Update stats
             self._update_file_stats()
 
@@ -349,12 +349,12 @@ class FileTransferRequestTab(QWidget):
         """Update the file count and total size labels"""
         file_count = len(self.selected_files)
         self.file_count_label.setText(f"Files: {file_count}")
-        
+
         # Format total size
         size_str = get_file_size_str(self.total_size)
-        
+
         self.total_size_label.setText(f"Total Size: {size_str}")
-        
+
         # Note: Create request button is always enabled (consistent with Log Transfer button)
         # Validation happens when user clicks the button
 
@@ -434,7 +434,7 @@ class FileTransferRequestTab(QWidget):
             if hashes else None
         )
         progress_dialog.canceled.connect(self.hash_worker.cancel)
-        
+
         self.hash_worker.start()
 
     def _on_hashes_calculated(self, hashes, request_log, base_request_dir, file_list_dir, progress_dialog):
@@ -459,10 +459,10 @@ class FileTransferRequestTab(QWidget):
                 request_log_name = request_log.config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
                 request_log_name = request_log_name.replace("{year}", year)
                 csv_file = os.path.join(base_dir, request_log_name)
-                
+
                 # Write to request log
                 request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
-        
+
         # Create and start processing worker
         self.processing_worker = FileProcessingWorker(
             request_log, self.selected_files, file_hashes, base_request_dir, file_list_dir,
@@ -470,7 +470,7 @@ class FileTransferRequestTab(QWidget):
         self.processing_worker.progress.connect(progress_dialog.setValue)
         self.processing_worker.finished.connect(lambda path: self._on_request_created(path, progress_dialog))
         progress_dialog.canceled.connect(self.processing_worker.cancel)
-        
+
         self.processing_worker.start()
 
         # Keep progress dialog responsive
@@ -480,11 +480,11 @@ class FileTransferRequestTab(QWidget):
     def _on_request_created(self, file_list_path, progress_dialog):
         """Handle request creation completion"""
         progress_dialog.close()
-        
+
         if file_list_path:
-            QMessageBox.information(self, "Success", 
+            QMessageBox.information(self, "Success",
                                   f"Request created successfully!\n\nFile list saved to:\n{file_list_path}")
-            
+
             # Open the files if requested
             if self.open_request_log_check.isChecked():
                 try:
@@ -496,7 +496,7 @@ class FileTransferRequestTab(QWidget):
                         subprocess.call(['xdg-open', file_list_path])
                 except Exception as e:
                     self.app.set_status_message(f"Error opening file: {str(e)}")
-                    
+
             self.app.set_status_message("Request created successfully")
         else:
             QMessageBox.warning(self, "Error", "Failed to create request")
@@ -509,11 +509,11 @@ class FileTransferRequestTab(QWidget):
             if success:
                 # Update UI components with new config values
                 self.app.set_status_message("Configuration reloaded successfully")
-                
+
                 # Update request output folder display
                 request_output_folder = self.config.get("Requests", "OutputFolder", fallback="./requests")
                 self.request_folder_edit.setText(os.path.abspath(request_output_folder))
-                
+
                 # Notify parent app
                 if hasattr(self.app, 'on_config_reloaded'):
                     self.app.on_config_reloaded()

@@ -30,9 +30,9 @@ class TransferLog(BaseLogModel):
     def save(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
         """Save the transfer log to CSV format with archive processing"""
         # Get the transfer log filename template from config
-        template = self.config.get("Logging", "TransferLogName", 
+        template = self.config.get("Logging", "TransferLogName",
                                   fallback="TransferLog_{year}.log")
-        
+
         # Prepare data for token replacement
         data = {
             'transfertype': self.transfer_type,
@@ -43,7 +43,7 @@ class TransferLog(BaseLogModel):
             'username': self.username,
             'computername': self.computer_name
         }
-        
+
         # Format the filename using the token system
         log_filename = format_filename(template, data, self.config)
         csv_file = os.path.join(log_dir, log_filename)
@@ -93,7 +93,7 @@ class TransferLog(BaseLogModel):
                         file_hashes: Optional[Dict[str, str]] = None,
                         progress_signal=None, cancel_check=None) -> str:
         """Save detailed file list with archive contents to CSV with optional progress reporting
-        
+
         This method supports both CLI (no progress) and GUI (with progress) usage.
         For CLI usage, simply omit progress_signal and cancel_check parameters.
         """
@@ -105,9 +105,9 @@ class TransferLog(BaseLogModel):
                                  progress_signal=None, cancel_check=None) -> str:
         """Save detailed file list with archive contents to CSV with progress reporting"""
         # Get filename template from config
-        template = self.config.get("Logging", "FileListName", 
+        template = self.config.get("Logging", "FileListName",
                              fallback="{timestamp}_{username}_{transfertype}_{source}-{destination}_FileList.csv")
-        
+
         # Prepare data for token replacement
         template_data = {
             'transfertype': self.transfer_type,
@@ -119,7 +119,7 @@ class TransferLog(BaseLogModel):
             'computername': self.computer_name,
             'timestamp': self.timestamp
         }
-        
+
         # Use shared file list writer
         return save_file_list_with_progress(
             output_dir=log_dir,

@@ -160,7 +160,7 @@ class FileTransferLoggerTab(QWidget):
         button_layout = QHBoxLayout()
 
         button_width = 120  # Width that accommodates "Remove Selected" with padding
-        
+
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_selected_files)
         clear_btn.setFixedWidth(button_width)
@@ -172,7 +172,7 @@ class FileTransferLoggerTab(QWidget):
         remove_selected_btn.setFixedWidth(button_width)
         remove_selected_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         button_layout.addWidget(remove_selected_btn)
-        
+
         # Add stretch in the middle to separate the button groups
         button_layout.addStretch()
 
@@ -257,7 +257,7 @@ class FileTransferLoggerTab(QWidget):
         import_request_action.setShortcut("Ctrl+I")
         import_request_action.triggered.connect(self.import_request_file)
         actions.append(import_request_action)
-        
+
         # Add separator
         separator = QAction(self)
         separator.setSeparator(True)
@@ -280,12 +280,12 @@ class FileTransferLoggerTab(QWidget):
         log_action.setShortcut("Ctrl+S")
         log_action.triggered.connect(self.log_transfer)
         actions.append(log_action)
-        
+
         # Add separator
         separator = QAction(self)
         separator.setSeparator(True)
         actions.append(separator)
-        
+
         # Reload Configuration
         reload_config_action = QAction("&Reload Configuration", self)
         reload_config_action.setShortcut("Ctrl+R")
@@ -371,15 +371,15 @@ class FileTransferLoggerTab(QWidget):
         label.setFixedWidth(self.label_width)
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         field_layout.addWidget(label)
-        
+
         combo = QComboBox()
         combo.setEditable(True)
         combo.addItem("")
-        
+
         # Add items to the dropdown
         if options:
             combo.addItems(options)
-        
+
         field_layout.addWidget(combo)
         layout.addLayout(field_layout)
         return combo
@@ -477,7 +477,7 @@ class FileTransferLoggerTab(QWidget):
     def _remove_files_not_in_request(self, files_to_remove):
         """Remove specific files from the selection by file path"""
         removed_count = 0
-        
+
         for file_path in files_to_remove:
             if file_path in self.selected_files:
                 try:
@@ -485,11 +485,11 @@ class FileTransferLoggerTab(QWidget):
                     self.total_size -= os.path.getsize(file_path)
                 except OSError:
                     pass  # File may have been deleted or is inaccessible
-                
+
                 # Remove from internal lists
                 self.selected_files.remove(file_path)
                 self.normalized_paths.remove(self._normalize_path(file_path))
-                
+
                 # Remove from UI list
                 for i in range(self.file_list.count()):
                     item = self.file_list.item(i)
@@ -497,7 +497,7 @@ class FileTransferLoggerTab(QWidget):
                         self.file_list.takeItem(i)
                         removed_count += 1
                         break
-        
+
         # Update file statistics
         self._update_file_stats()
         return removed_count
@@ -506,7 +506,7 @@ class FileTransferLoggerTab(QWidget):
         """Import files from a request CSV file or plain text file list"""
         # Get the default request folder from config
         request_folder = self.config.get("Requests", "OutputFolder", fallback="./requests")
-        
+
         # Open file dialog to select request file or file list
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
@@ -514,21 +514,21 @@ class FileTransferLoggerTab(QWidget):
             request_folder,
             "Request Files (*.csv);;Text Files (*.txt);;All files (*.*)"
         )
-        
+
         if not file_path:
             return
-            
+
         try:
             self.app.set_status_message("Importing request file...")
-            
+
             # Parse the request file and get file list
             request_data, file_list = self._parse_request_file(file_path)
-            
+
             if not file_list:
-                QMessageBox.warning(self, "Import Error", 
+                QMessageBox.warning(self, "Import Error",
                                    "Could not parse request file or no files found to import.")
                 return
-            
+
             # Show request information for reference, but only import files
             if request_data:
                 info_message = (
@@ -542,18 +542,18 @@ class FileTransferLoggerTab(QWidget):
                     f"Import {len(file_list)} files from this request?\n\n"
                     f"Note: No request metadata found, but files can still be imported."
                 )
-            
+
             reply = QMessageBox.question(
-                self, 
+                self,
                 "Import Request Files",
                 info_message,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
-            
+
             if reply == QMessageBox.StandardButton.No:
                 return
-            
+
             # Check if there are existing files not in the request
             if self.selected_files:
                 request_file_paths = set()
@@ -563,20 +563,20 @@ class FileTransferLoggerTab(QWidget):
                         # Normalize the request file path for comparison
                         normalized_request_path = self._normalize_path(file_path)
                         request_file_paths.add(normalized_request_path)
-                
+
                 # Find existing files not in the request
                 existing_not_in_request = []
                 for existing_file in self.selected_files:
                     normalized_existing_path = self._normalize_path(existing_file)
                     if normalized_existing_path not in request_file_paths:
                         existing_not_in_request.append(existing_file)
-                
+
                 # Show warning if there are existing files not in the request
                 if existing_not_in_request:
                     warning_message = (
                         f"Warning: You have {len(existing_not_in_request)} existing file(s) selected that are NOT in this request:\n\n"
                     )
-                    
+
                     # Show first few files as examples with filename truncation
                     max_filename_length = 50  # Reasonable limit for dialog width
                     for existing_file in existing_not_in_request[:3]:
@@ -596,39 +596,39 @@ class FileTransferLoggerTab(QWidget):
                         else:
                             truncated = filename
                         warning_message += f"• {truncated}\n"
-                    
+
                     if len(existing_not_in_request) > 3:
                         warning_message += f"• ... and {len(existing_not_in_request) - 3} more\n"
-                    
+
                     warning_message += (
                         f"\nThese files will remain selected along with the {len(file_list)} request files.\n"
                         f"This means your transfer will include files from multiple sources.\n\n"
                         f"How would you like to proceed?"
                     )
-                    
+
                     # Create custom dialog with three options
                     warning_dialog = QMessageBox(self)
                     warning_dialog.setWindowTitle("Mixed File Sources Warning")
                     warning_dialog.setText(warning_message)
                     warning_dialog.setIcon(QMessageBox.Icon.Warning)
-                    
+
                     # Add three buttons
                     keep_all_btn = warning_dialog.addButton("Keep All", QMessageBox.ButtonRole.AcceptRole)
                     remove_extra_btn = warning_dialog.addButton("Remove Files", QMessageBox.ButtonRole.ActionRole)
                     cancel_btn = warning_dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-                    
+
                     # Set tooltips for clarity
                     keep_all_btn.setToolTip("Import request files and keep existing files (mixed sources)")
                     remove_extra_btn.setToolTip("Remove existing files not in request, then import request files")
                     cancel_btn.setToolTip("Cancel import and keep current file selection unchanged")
-                    
+
                     # Set default button to the safest option
                     warning_dialog.setDefaultButton(cancel_btn)
-                    
+
                     # Show dialog and handle response
                     warning_dialog.exec()
                     clicked_button = warning_dialog.clickedButton()
-                    
+
                     if clicked_button == cancel_btn:
                         return  # Cancel import
                     elif clicked_button == remove_extra_btn:
@@ -636,11 +636,11 @@ class FileTransferLoggerTab(QWidget):
                         self._remove_files_not_in_request(existing_not_in_request)
                         self.app.set_status_message(f"Removed {len(existing_not_in_request)} files not in request")
                     # If keep_all_btn, just continue with import (no action needed)
-            
+
             # Import files from the request
             added_count = 0
             missing_files = []
-            
+
             for file_path_entry in file_list:
                 file_path = file_path_entry.get('FullName', '')
                 if file_path and os.path.exists(file_path):
@@ -648,10 +648,10 @@ class FileTransferLoggerTab(QWidget):
                         added_count += 1
                 else:
                     missing_files.append(file_path)
-            
+
             # Update file statistics
             self._update_file_stats()
-            
+
             # Show results
             message = f"Successfully imported {added_count} files from request."
             if missing_files:
@@ -660,22 +660,19 @@ class FileTransferLoggerTab(QWidget):
                     message += f"\n• {missing_file}"
                 if len(missing_files) > 5:
                     message += f"\n• ... and {len(missing_files) - 5} more"
-            
+
             QMessageBox.information(self, "Import Complete", message)
             self.app.set_status_message(f"Imported {added_count} files from request")
-            
+
         except Exception as e:
-            QMessageBox.critical(self, "Import Error", f"Error importing request file:\n{str(e)}")
-            self.app.set_status_message(f"Error importing request: {str(e)}")
+            QMessageBox.critical(self, "Import Error", f"Error importing request file:\n{e!s}")
+            self.app.set_status_message(f"Error importing request: {e!s}")
 
     def _parse_request_file(self, file_path):
         """Parse a request file (CSV or plain text) and return request data and file list"""
-        request_data = None
-        file_list = []
-        
         # Detect file type by extension first, then by content if needed
         file_extension = os.path.splitext(file_path)[1].lower()
-        
+
         if file_extension == '.txt':
             # Handle plain text file (one file path per line)
             return self._parse_text_file_list(file_path)
@@ -685,16 +682,16 @@ class FileTransferLoggerTab(QWidget):
         else:
             # Unknown extension - try to auto-detect by content
             return self._parse_auto_detect_file(file_path)
-    
+
     def _parse_auto_detect_file(self, file_path):
         """Auto-detect file format and parse accordingly"""
         try:
             # Read first few lines to detect format
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 first_line = f.readline().strip()
                 if not first_line:
                     return None, []
-                
+
                 # Check if first line looks like CSV headers
                 if ',' in first_line and any(header in first_line.upper() for header in ['LEVEL', 'FULLNAME', 'CONTAINER']):
                     # Looks like a CSV file
@@ -702,40 +699,40 @@ class FileTransferLoggerTab(QWidget):
                 else:
                     # Treat as text file
                     return self._parse_text_file_list(file_path)
-                    
+
         except Exception as e:
             print(f"Error auto-detecting file format: {str(e)}")
             # Default to text file parsing
             return self._parse_text_file_list(file_path)
-    
+
     def _parse_text_file_list(self, file_path):
         """Parse a plain text file with one file path per line"""
         request_data = None
         file_list = []
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
                     original_line = line.rstrip('\r\n')
                     file_path_entry = original_line.strip()
-                    
+
                     # Skip empty lines and comments (lines starting with # or //)
                     if not file_path_entry or file_path_entry.startswith(('#', '//')):
                         continue
-                    
+
                     # Handle quoted paths (remove surrounding quotes)
                     if ((file_path_entry.startswith('"') and file_path_entry.endswith('"')) or
                         (file_path_entry.startswith("'") and file_path_entry.endswith("'"))):
                         file_path_entry = file_path_entry[1:-1]
-                    
+
                     # Skip if still empty after quote removal
                     if not file_path_entry:
                         continue
-                    
+
                     try:
                         # Normalize the path
                         normalized_path = os.path.normpath(os.path.abspath(file_path_entry))
-                        
+
                         # Add to file list (using minimal structure compatible with existing code)
                         file_list.append({
                             'Level': '0',
@@ -746,25 +743,25 @@ class FileTransferLoggerTab(QWidget):
                         })
                     except Exception as path_error:
                         print(f"Warning: Could not process path on line {line_num}: '{original_line}' - {str(path_error)}")
-                    
+
         except Exception as e:
-            print(f"Error reading text file list: {str(e)}")
-            
+            print(f"Error reading text file list: {e!s}")
+
         return request_data, file_list
-    
+
     def _parse_csv_request_file(self, file_path):
         """Parse a CSV request file (original functionality)"""
         request_data = None
         file_list = []
-        
+
         # Normalize the file path for comparison
         normalized_file_path = os.path.normpath(os.path.abspath(file_path))
-        
+
         # First, try to find the request log entry that corresponds to this file
         request_log_dir = os.path.dirname(os.path.dirname(file_path))  # Go up two levels from year subfolder
         year = datetime.datetime.now().strftime("%Y")
         request_log_file = os.path.join(request_log_dir, f"RequestLog_{year}.log")
-        
+
         # Look for the request log entry that references this file
         if os.path.exists(request_log_file):
             try:
@@ -788,7 +785,7 @@ class FileTransferLoggerTab(QWidget):
                                 break
             except Exception as e:
                 print(f"Error reading request log: {str(e)}")
-        
+
         # Parse the file list from the CSV (this should work regardless of metadata)
         try:
             with open(file_path, 'r', newline='', encoding='utf-8') as f:
@@ -805,7 +802,7 @@ class FileTransferLoggerTab(QWidget):
                         })
         except Exception as e:
             print(f"Error reading request file list: {str(e)}")
-            
+
         return request_data, file_list
 
     def log_transfer(self):
@@ -868,7 +865,7 @@ class FileTransferLoggerTab(QWidget):
 
         # Get the base log directory (OutputFolder) for the transfer log
         base_log_dir = self.log_folder_edit.text()
-        
+
         # Create year subfolder for file list logs
         year = datetime.datetime.now().strftime("%Y")
         file_list_dir = os.path.join(base_log_dir, year)
@@ -932,7 +929,7 @@ class FileTransferLoggerTab(QWidget):
         def save_transfer_log(base_dir, formatted_timestamp, file_list_path):
             year = datetime.datetime.now().strftime("%Y")
             csv_file = os.path.join(base_dir, f"TransferLog_{year}.log")
-            
+
             # Format transfer data for CSV
             fields = [
                 formatted_timestamp,
@@ -949,18 +946,18 @@ class FileTransferLoggerTab(QWidget):
                 str(transfer_log.total_size),
                 file_list_path
             ]
-            
+
             # Write the log entry to the CSV file
             file_exists = os.path.isfile(csv_file)
             with open(csv_file, 'a', newline='') as f:
                 writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-                
+
                 # Write headers if file is new
                 if not file_exists:
                     writer.writerow(TRANSFER_LOG_HEADERS)
-                
+
                 writer.writerow(fields)
-        
+
         # Create worker thread for file processing
         self.file_worker = FileProcessingWorker(
             transfer_log, self.selected_files, hashes, base_log_dir, file_list_dir,
@@ -1032,7 +1029,7 @@ class FileTransferLoggerTab(QWidget):
             if success:
                 # Update UI components with new config values
                 self.app.set_status_message("Configuration reloaded successfully")
-                
+
                 # Update media types
                 self.media_types = self.config.get_list("UI", "MediaTypes")
                 current_media_type = self.media_type_combo.currentText()
@@ -1043,7 +1040,7 @@ class FileTransferLoggerTab(QWidget):
                 index = self.media_type_combo.findText(current_media_type)
                 if index > 0:
                     self.media_type_combo.setCurrentIndex(index)
-                
+
                 # Update network lists
                 self.network_list = self.config.get_list("UI", "NetworkList")
                 # Source
@@ -1062,7 +1059,7 @@ class FileTransferLoggerTab(QWidget):
                 index = self.destination_combo.findText(current_dest)
                 if index > 0:
                     self.destination_combo.setCurrentIndex(index)
-                
+
                 # Update transfer types
                 self.transfer_types = self.config.get_transfer_types()
                 current_transfer_type = self.transfer_type_combo.currentText()
@@ -1072,7 +1069,7 @@ class FileTransferLoggerTab(QWidget):
                 index = self.transfer_type_combo.findText(current_transfer_type)
                 if index > 0:
                     self.transfer_type_combo.setCurrentIndex(index)
-                
+
                 # Update media ID list
                 media_id_prefixes = self.config.get_list("UI", "MediaID")
                 current_text = self.media_id_edit.currentText()
@@ -1082,23 +1079,23 @@ class FileTransferLoggerTab(QWidget):
                     self.media_id_edit.addItems(media_id_prefixes)
                 if current_text:
                     self.media_id_edit.setCurrentText(current_text)
-                
+
                 # Update log folder
                 log_output_folder = self.config.get("Logging", "OutputFolder", fallback="./logs")
                 self.log_folder_edit.setText(os.path.abspath(log_output_folder))
-                
+
                 # Show success message
-                QMessageBox.information(self, "Configuration Reloaded", 
+                QMessageBox.information(self, "Configuration Reloaded",
                                        "Configuration has been successfully reloaded.")
-                
+
                 # Notify the main app that config has changed
                 if hasattr(self, 'app') and hasattr(self.app, 'on_config_reloaded'):
                     self.app.on_config_reloaded()
             else:
                 self.app.set_status_message("Failed to reload configuration")
-                QMessageBox.warning(self, "Reload Failed", 
+                QMessageBox.warning(self, "Reload Failed",
                                    "Failed to reload the configuration file.")
         except Exception as e:
             self.app.set_status_message(f"Error reloading configuration: {str(e)}")
-            QMessageBox.critical(self, "Error", 
+            QMessageBox.critical(self, "Error",
                                 f"Error reloading configuration: {str(e)}")

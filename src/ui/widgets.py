@@ -9,7 +9,7 @@ from utils.file_utils import get_all_files
 
 class DragDropFileListWidget(QListWidget):
     """Reusable file list widget with drag and drop support.
-    
+
     The parent widget must implement:
     - _add_file(file_path: str) -> bool: Add a file to the list, return True if added
     - _update_file_stats(): Update file statistics display

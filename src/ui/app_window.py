@@ -24,7 +24,7 @@ class DTATransferLogApp(QMainWindow):
         else:
             # Normal Execution
             icon_path = os.path.join("resources", "icons", "dtatransferlog.png")
-        
+
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         else:

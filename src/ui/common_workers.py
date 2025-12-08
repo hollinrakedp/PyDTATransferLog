@@ -10,16 +10,15 @@ import os
 import csv
 from PySide6.QtCore import QThread, Signal
 from utils.file_utils import calculate_file_hash
-from constants import TRANSFER_LOG_HEADERS
 
 
 class FileHashWorker(QThread):
     """
     Worker thread for calculating file hashes.
-    
+
     This worker can be used by any UI component that needs to calculate
     SHA-256 hashes for a list of files with progress reporting.
-    
+
     Signals:
         progress: Emits progress percentage (0-100)
         finished: Emits dictionary mapping file paths to hash values
@@ -30,7 +29,7 @@ class FileHashWorker(QThread):
     def __init__(self, files):
         """
         Initialize the hash worker.
-        
+
         Args:
             files: List of file paths to calculate hashes for
         """
@@ -56,23 +55,23 @@ class FileHashWorker(QThread):
                 self.hashes[file] = calculate_file_hash(file)
                 self.progress.emit(int((i + 1) / total * 100))
             except Exception as e:
-                self.hashes[file] = f"ERROR: {str(e)}"
-        
+                self.hashes[file] = f"ERROR: {e!s}"
+
         self.finished.emit(self.hashes)
 
 
 class FileProcessingWorker(QThread):
     """
     Worker thread for processing files and creating log/request entries.
-    
+
     This worker uses dependency injection to work with different model types
     (TransferLog, RequestLog).
     The model must implement:
         - _save_file_list_with_progress(dir, files, hashes, progress_callback, cancel_check)
         - Properties: timestamp, and model-specific fields
-    
+
     The save_callback function handles model-specific annual log creation.
-    
+
     Signals:
         progress: Emits progress percentage (0-100)
         finished: Emits the file list path (empty string on error/cancel)
@@ -84,7 +83,7 @@ class FileProcessingWorker(QThread):
                  save_callback=None):
         """
         Initialize the file processing worker.
-        
+
         Args:
             model: TransferLog or RequestLog instance
             files: List of file paths to process
@@ -140,7 +139,7 @@ class FileProcessingWorker(QThread):
                 # Format timestamp for CSV
                 ts = self.model.timestamp
                 formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-                
+
                 # Call the model-specific save callback
                 self.save_callback(
                     self.base_log_dir, 
