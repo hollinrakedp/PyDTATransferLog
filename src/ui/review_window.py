@@ -638,7 +638,12 @@ class TransferLogReviewerTab(QWidget):
             return
         
         entries_per_page = -1 if self.entries_per_page == "All" else int(self.entries_per_page)
-        
+
+        try:
+            total_size_col = TRANSFER_LOG_HEADERS.index("Total Size")
+        except ValueError:
+            total_size_col = 11
+
         # Paginate entries
         page_entries = self.model.paginate_entries(self.filtered_entries, self.current_page, entries_per_page)
         
@@ -646,12 +651,15 @@ class TransferLogReviewerTab(QWidget):
         for entry in page_entries:
             item = QTreeWidgetItem(self.log_tree)
             for i, value in enumerate(entry):
-                # Format total size column (index 10)
-                if i == 10:  # Total Size column
-                    formatted_size = get_file_size_str(int(value) if value.isdigit() else 0)
-                    item.setText(i, formatted_size)
-                    # Store original size for sorting
-                    item.setData(i, Qt.UserRole, int(value) if value.isdigit() else 0)
+                if i == total_size_col:
+                    # Format total size with friendly units; store raw bytes for sorting
+                    try:
+                        size_val = int(value)
+                    except (TypeError, ValueError):
+                        size_val = 0
+
+                    item.setText(i, get_file_size_str(size_val))
+                    item.setData(i, Qt.UserRole, size_val)
                 else:
                     item.setText(i, value)
         
