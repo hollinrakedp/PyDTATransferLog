@@ -1,9 +1,7 @@
 import os
 import sys
-import datetime
 from PySide6.QtWidgets import (QMainWindow, QTabWidget, QMessageBox)
 from PySide6.QtGui import QIcon, QAction
-from PySide6.QtCore import Qt
 from ui.log_window import FileTransferLoggerTab
 from ui.review_window import TransferLogReviewerTab
 from ui.request_window import FileTransferRequestTab

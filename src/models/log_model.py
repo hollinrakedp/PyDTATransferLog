@@ -1,11 +1,9 @@
 import os
 import csv
-import datetime
 from typing import List, Optional, Dict
 from constants import FILE_LIST_HEADERS
-from utils.file_utils import FileInfo, format_filename, format_display_path
+from utils.file_utils import format_filename, format_display_path
 from utils.file_list_writer import save_file_list_with_progress
-from utils.archive_utils import ArchiveProcessor
 from models.base_model import BaseLogModel
 
 

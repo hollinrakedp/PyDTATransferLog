@@ -215,15 +215,13 @@ def run_request_cli():
     if args.request_date:
         # Validate date format
         try:
-            import datetime as dt
-            parsed_date = dt.datetime.strptime(args.request_date, "%m/%d/%Y")
+            parsed_date = datetime.datetime.strptime(args.request_date, "%m/%d/%Y")
             request_date = args.request_date
         except ValueError:
             print("Error: Request date must be in MM/dd/yyyy format")
             return
     else:
-        import datetime as dt
-        request_date = dt.datetime.now().strftime("%m/%d/%Y")
+        request_date = datetime.datetime.now().strftime("%m/%d/%Y")
 
     # Set computer name
     computer_name = args.computer_name if args.computer_name else socket.gethostname()

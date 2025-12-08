@@ -4,7 +4,6 @@ from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPu
 from PySide6.QtGui import QFont
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
-from version import VERSION
 from cli.handlers import run_cli, run_request_cli, create_gui_parser
 
 def is_console_available():

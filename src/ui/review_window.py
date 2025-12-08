@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QComboBox, QPushButton, QSplitter, QTreeWidget,
                                QTreeWidgetItem, QLineEdit, QHeaderView,
                                QFileDialog, QMessageBox, QDateEdit)
-from PySide6.QtCore import Qt, QSize, QDate
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QAction, QIcon
 from constants import TRANSFER_LOG_HEADERS
 from utils.file_utils import get_file_size_str
