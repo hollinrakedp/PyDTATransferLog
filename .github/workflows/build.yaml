@@ -191,10 +191,10 @@ print('✅ All required files present')
           git push
 
   # Job 5: Build executables (Windows, Ubuntu, RHEL9)
-  # Depends on all testing completing
+  # Depends on all testing completing (version update is optional on main branch)
   build:
     name: Build Executable
-    needs: [lint-and-check, test-cli, test-gui, update-version]
+    needs: [lint-and-check, test-cli, test-gui]
     if: always() && (needs.lint-and-check.result == 'success' && needs.test-cli.result == 'success' && needs.test-gui.result == 'success')
     strategy:
       matrix:
