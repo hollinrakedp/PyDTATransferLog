@@ -5,7 +5,7 @@ from utils.file_utils import FileInfo, get_file_size_str
 class BaseLogModel:
     """Base class for transfer and request logs"""
 
-    def __init__(self, config, timestamp, computer_name, file_count=0, total_size=0):
+    def __init__(self, config: object, timestamp: str, computer_name: str, file_count: int = 0, total_size: int = 0) -> None:
         self.config = config
         self.timestamp = timestamp
         self.computer_name = computer_name

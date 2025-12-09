@@ -128,10 +128,11 @@ def save_file_list_with_progress(
                     if progress_callback:
                         try:
                             progress = int((index + 1) / total_files * 100)
-                            progress_callback.emit(progress)
+                            if hasattr(progress_callback, 'emit'):
+                                progress_callback.emit(progress)
                         except Exception as e:
                             # If progress update fails, just continue
-                            print(f"Progress update failed: {e!s}")
+                            print(f"Progress update failed: {str(e)}")
 
         return file_list_path
 

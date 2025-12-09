@@ -8,7 +8,7 @@ import os
 import tarfile
 import zipfile
 from collections.abc import Callable
-from typing import BinaryIO
+from typing import IO
 
 
 class ArchiveProcessor:
@@ -66,7 +66,7 @@ class ArchiveProcessor:
             ])
 
     @staticmethod
-    def _process_zip_file(writer, zip_path: str | BinaryIO, level: int,
+    def _process_zip_file(writer, zip_path: str | IO[bytes], level: int,
                          file_hashes: dict[str, str] | None = None,
                          container_name: str | None = None,
                          hash_calculator: Callable | None = None):
@@ -191,7 +191,7 @@ class ArchiveProcessor:
             print(f"Error processing TAR file {tar_path}: {e!s}")
 
     @staticmethod
-    def _process_gz_file(writer, gz_path: str | BinaryIO | bytes, level: int,
+    def _process_gz_file(writer, gz_path: str | IO[bytes] | bytes, level: int,
                         file_hashes: dict[str, str] | None = None,
                         container_name: str | None = None,
                         hash_calculator: Callable | None = None):
@@ -243,4 +243,4 @@ class ArchiveProcessor:
 
         except Exception as e:
             # Log error but continue processing
-            print(f"Error processing GZ file {gz_path}: {e!s}")
+            print(f"Error processing GZ file {gz_path}: {str(e)}")
