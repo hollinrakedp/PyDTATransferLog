@@ -243,4 +243,4 @@ class ArchiveProcessor:
 
         except Exception as e:
             # Log error but continue processing
-            print(f"Error processing GZ file {gz_path}: {e!s}")
+            print(f"Error processing GZ file {gz_path!r}: {e!s}")

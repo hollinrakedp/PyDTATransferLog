@@ -1,3 +1,4 @@
+from typing import Any
 
 from utils.file_utils import FileInfo, get_file_size_str
 
@@ -5,7 +6,7 @@ from utils.file_utils import FileInfo, get_file_size_str
 class BaseLogModel:
     """Base class for transfer and request logs"""
 
-    def __init__(self, config: object, timestamp: str, computer_name: str, file_count: int = 0, total_size: int = 0) -> None:
+    def __init__(self, config: Any, timestamp: str, computer_name: str, file_count: int = 0, total_size: int = 0) -> None:
         self.config = config
         self.timestamp = timestamp
         self.computer_name = computer_name
@@ -21,4 +22,5 @@ class BaseLogModel:
 
     def format_total_size(self) -> str:
         """Format the total size as a human-readable string"""
-        return get_file_size_str(self.total_size)
+        result: str = get_file_size_str(self.total_size)
+        return result
