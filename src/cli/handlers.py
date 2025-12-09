@@ -1,21 +1,23 @@
-import sys
-import os
 import argparse
-import socket
-import getpass
-import datetime
 import csv
-from utils.config_manager import ConfigManager
-from version import VERSION
+import datetime
+import getpass
+import os
+import socket
+import sys
+
+from constants import TRANSFER_LOG_HEADERS
+from models.log_model import TransferLog
+from models.request_model import RequestLog
 from utils.cli_utils import (
-    resolve_output_folder,
     collect_files,
     compute_hashes,
     format_timestamp,
+    resolve_output_folder,
 )
-from models.log_model import TransferLog
-from models.request_model import RequestLog
-from constants import TRANSFER_LOG_HEADERS
+from utils.config_manager import ConfigManager
+from version import VERSION
+
 
 def create_gui_parser():
     """Create the same argument parser used in GUI mode for help extraction"""
@@ -209,7 +211,7 @@ def run_request_cli():
     if args.request_date:
         # Validate date format
         try:
-            parsed_date = datetime.datetime.strptime(args.request_date, "%m/%d/%Y")
+            datetime.datetime.strptime(args.request_date, "%m/%d/%Y")
             request_date = args.request_date
         except ValueError:
             print("Error: Request date must be in MM/dd/yyyy format")

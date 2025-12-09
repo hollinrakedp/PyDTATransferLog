@@ -1,11 +1,10 @@
-import os
-import hashlib
-import re
 import datetime
-import socket
 import getpass
+import hashlib
+import os
+import re
+import socket
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -13,7 +12,7 @@ class FileInfo:
     """Class for tracking file information"""
     path: str
     sha256: str = ""
-    size: Optional[int] = None
+    size: int | None = None
 
     @property
     def name(self) -> str:
@@ -24,6 +23,11 @@ class FileInfo:
     def directory(self) -> str:
         """Get the directory containing the file"""
         return os.path.dirname(self.path)
+
+    @property
+    def full_path(self) -> str:
+        """Get the absolute path for compatibility with legacy tests"""
+        return os.path.abspath(self.path)
 
     @property
     def size_str(self) -> str:
@@ -111,6 +115,16 @@ def calculate_file_hash(filepath, algorithm='sha256', buffer_size=65536):
             buffer = f.read(buffer_size)
 
     return hash_obj.hexdigest()
+
+
+def get_file_info(filepath: str) -> FileInfo:
+    """Legacy helper to return FileInfo with populated size and path data"""
+    normalized_path = format_display_path(filepath)
+    try:
+        size = os.path.getsize(normalized_path)
+    except (OSError, ValueError):
+        size = None
+    return FileInfo(path=normalized_path, size=size)
 
 def get_file_size_str(size_bytes):
     """

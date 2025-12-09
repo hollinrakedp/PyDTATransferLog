@@ -1,10 +1,13 @@
-import sys
 import os
-from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
+import sys
+
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout
+
+from cli.handlers import create_gui_parser, run_cli, run_request_cli
 from ui.app_window import DTATransferLogApp
 from utils.config_manager import ConfigManager
-from cli.handlers import run_cli, run_request_cli, create_gui_parser
+
 
 def is_console_available():
     """Check if console output is available"""
@@ -22,9 +25,9 @@ def is_console_available():
 
 def generate_gui_help_content():
     """Generate help content for GUI dialog from argparse parser"""
-    import io
     import contextlib
-    
+    import io
+
     # Create parser and capture its help output
     parser = create_gui_parser()
 

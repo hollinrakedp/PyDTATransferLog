@@ -1,7 +1,8 @@
-import os
-import sys
-import shutil
 import configparser
+import os
+import shutil
+import sys
+
 
 class ConfigManager:
     """Class for managing application configuration"""
@@ -54,7 +55,7 @@ class ConfigManager:
             print(f"Created default configuration at: {self.config_path}")
 
         except Exception as e:
-            print(f"ERROR: Failed to create default configuration: {str(e)}")
+            print(f"ERROR: Failed to create default configuration: {e!s}")
             print("The application may not function correctly without a valid configuration file.")
 
     def get(self, section, option, fallback=None):
@@ -88,7 +89,11 @@ class ConfigManager:
         # Cache the result
         self._transfer_types_cache = mapping
         return mapping
-    
+
+    def get_media_types(self):
+        """Get list of media types from the UI section"""
+        return self.get_list("UI", "MediaTypes")
+
     def save(self):
         """Save configuration to file"""
         with open(self.config_path, "w") as f:
@@ -104,5 +109,5 @@ class ConfigManager:
                 return True
             return False
         except Exception as e:
-            print(f"Error reloading configuration: {str(e)}")
+            print(f"Error reloading configuration: {e!s}")
             return False

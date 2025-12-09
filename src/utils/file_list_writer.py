@@ -6,24 +6,25 @@ with progress reporting, cancellation support, and archive content inspection.
 Used by both TransferLog and RequestLog models.
 """
 
-import os
 import csv
-from typing import List, Dict, Optional, Callable
-from utils.file_utils import format_filename, format_display_path
+import os
+from collections.abc import Callable
+
 from utils.archive_utils import ArchiveProcessor
+from utils.file_utils import format_display_path, format_filename
 
 
 def save_file_list_with_progress(
     output_dir: str,
-    files: List[str],
-    file_hashes: Optional[Dict[str, str]],
-    csv_headers: List[str],
+    files: list[str],
+    file_hashes: dict[str, str] | None,
+    csv_headers: list[str],
     filename_template: str,
     template_data: dict,
     config,
-    progress_callback: Optional[Callable] = None,
-    cancel_check: Optional[Callable] = None,
-    path_formatter: Optional[Callable] = None
+    progress_callback: Callable | None = None,
+    cancel_check: Callable | None = None,
+    path_formatter: Callable | None = None
 ) -> str:
     """
     Save a detailed file list CSV with progress reporting and archive processing.
@@ -106,7 +107,7 @@ def save_file_list_with_progress(
                     try:
                         os.remove(file_list_path)
                     except Exception as e:
-                        print(f"Error removing partial file on cancel: {str(e)}")
+                        print(f"Error removing partial file on cancel: {e!s}")
                     return ""
 
                 if os.path.isfile(file_path):
@@ -130,12 +131,12 @@ def save_file_list_with_progress(
                             progress_callback.emit(progress)
                         except Exception as e:
                             # If progress update fails, just continue
-                            print(f"Progress update failed: {str(e)}")
+                            print(f"Progress update failed: {e!s}")
 
         return file_list_path
 
     except Exception as e:
-        print(f"Error in save_file_list_with_progress: {str(e)}")
+        print(f"Error in save_file_list_with_progress: {e!s}")
         # Clean up partial file if an error occurs
         if os.path.exists(file_list_path):
             try:

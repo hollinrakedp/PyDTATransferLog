@@ -3,20 +3,21 @@ Archive processing utilities for both transfer logs and requests.
 This module provides shared functionality for processing ZIP, TAR, and GZ files.
 """
 
-import os
-import zipfile
-import tarfile
 import gzip
-from typing import Union, BinaryIO, Optional, Dict, Callable
+import os
+import tarfile
+import zipfile
+from collections.abc import Callable
+from typing import BinaryIO
 
 
 class ArchiveProcessor:
     """Utility class for processing various archive formats"""
-    
+
     @staticmethod
-    def process_file_with_archives(writer, file_path: str, file_hashes: Optional[Dict[str, str]], 
-                                 level: int, container_name: str = "", 
-                                 hash_calculator: Optional[Callable] = None):
+    def process_file_with_archives(writer, file_path: str, file_hashes: dict[str, str] | None,
+                                 level: int, container_name: str = "",
+                                 hash_calculator: Callable | None = None):
         """
         Process a file and its archive contents if applicable.
 
@@ -45,13 +46,13 @@ class ArchiveProcessor:
             # Check if this is an archive file and process its contents
             file_lower = file_path.lower()
             if file_lower.endswith('.zip'):
-                ArchiveProcessor._process_zip_file(writer, file_path, level + 1, 
+                ArchiveProcessor._process_zip_file(writer, file_path, level + 1,
                                                  file_hashes, file_path, hash_calculator)
             elif file_lower.endswith(('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tar.xz')):
-                ArchiveProcessor._process_tar_file(writer, file_path, level + 1, 
+                ArchiveProcessor._process_tar_file(writer, file_path, level + 1,
                                                  file_hashes, file_path, hash_calculator)
             elif file_lower.endswith('.gz') and not file_lower.endswith('.tar.gz'):
-                ArchiveProcessor._process_gz_file(writer, file_path, level + 1, 
+                ArchiveProcessor._process_gz_file(writer, file_path, level + 1,
                                                 file_hashes, file_path, hash_calculator)
 
         except Exception as e:
@@ -61,14 +62,14 @@ class ArchiveProcessor:
                 container_name,
                 file_path,
                 "ERROR",
-                f"ERROR: {str(e)}"
+                f"ERROR: {e!s}"
             ])
 
     @staticmethod
-    def _process_zip_file(writer, zip_path: Union[str, BinaryIO], level: int,
-                         file_hashes: Optional[Dict[str, str]] = None,
-                         container_name: Optional[str] = None,
-                         hash_calculator: Optional[Callable] = None):
+    def _process_zip_file(writer, zip_path: str | BinaryIO, level: int,
+                         file_hashes: dict[str, str] | None = None,
+                         container_name: str | None = None,
+                         hash_calculator: Callable | None = None):
         """Process a ZIP file and write its contents to the writer."""
         if file_hashes is None:
             file_hashes = {}
@@ -106,27 +107,27 @@ class ArchiveProcessor:
                         if file_info.filename.lower().endswith('.zip'):
                             try:
                                 with zip_ref.open(file_info) as inner_file:
-                                    ArchiveProcessor._process_zip_file(writer, inner_file, level + 1, 
+                                    ArchiveProcessor._process_zip_file(writer, inner_file, level + 1,
                                                                      file_hashes, file_info.filename, hash_calculator)
                             except (OSError, ValueError, KeyError):
                                 pass  # Skip nested archives if they can't be processed
                         elif file_info.filename.lower().endswith(('.tar', '.tar.gz', '.tgz')):
                             try:
                                 with zip_ref.open(file_info) as inner_file:
-                                    ArchiveProcessor._process_tar_file(writer, inner_file, level + 1, 
+                                    ArchiveProcessor._process_tar_file(writer, inner_file, level + 1,
                                                                      file_hashes, file_info.filename, hash_calculator)
                             except (OSError, ValueError, KeyError):
                                 pass  # Skip nested archives if they can't be processed
 
         except Exception as e:
             # Log error but continue processing
-            print(f"Error processing ZIP file {zip_path}: {str(e)}")
+            print(f"Error processing ZIP file {zip_path}: {e!s}")
 
     @staticmethod
-    def _process_tar_file(writer, tar_path: Union[str, BinaryIO], level: int,
-                         file_hashes: Optional[Dict[str, str]] = None,
-                         container_name: Optional[str] = None,
-                         hash_calculator: Optional[Callable] = None):
+    def _process_tar_file(writer, tar_path: str | BinaryIO, level: int,
+                         file_hashes: dict[str, str] | None = None,
+                         container_name: str | None = None,
+                         hash_calculator: Callable | None = None):
         """Process a TAR file and write its contents to the writer."""
         if file_hashes is None:
             file_hashes = {}
@@ -187,13 +188,13 @@ class ArchiveProcessor:
 
         except Exception as e:
             # Log error but continue processing
-            print(f"Error processing TAR file {tar_path}: {str(e)}")
+            print(f"Error processing TAR file {tar_path}: {e!s}")
 
     @staticmethod
-    def _process_gz_file(writer, gz_path: Union[str, BinaryIO, bytes], level: int,
-                        file_hashes: Optional[Dict[str, str]] = None,
-                        container_name: Optional[str] = None,
-                        hash_calculator: Optional[Callable] = None):
+    def _process_gz_file(writer, gz_path: str | BinaryIO | bytes, level: int,
+                        file_hashes: dict[str, str] | None = None,
+                        container_name: str | None = None,
+                        hash_calculator: Callable | None = None):
         """Process a GZ file and write its contents to the writer."""
         if file_hashes is None:
             file_hashes = {}
@@ -242,4 +243,4 @@ class ArchiveProcessor:
 
         except Exception as e:
             # Log error but continue processing
-            print(f"Error processing GZ file {gz_path}: {str(e)}")
+            print(f"Error processing GZ file {gz_path}: {e!s}")

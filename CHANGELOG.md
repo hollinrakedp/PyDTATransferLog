@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Type Hints Modernization**: Updated all type hints to Python 3.10+ syntax (PEP 604)
+  - Replaced `List` → `list`, `Dict` → `dict`, `Optional[T]` → `T | None`, `Union` → `|`
+  - Replaced `Tuple` → `tuple`, imported `Callable` from `collections.abc`
+  - Modernized type annotations across all utility and CLI modules
+- **Error Handling Improvements**: Enhanced exception handling throughout codebase
+  - Replaced bare `except` clauses with specific exception types
+  - Added input validation guards (e.g., format_timestamp malformed input)
+  - Improved exception messages with f-string formatting (`{e!s}` instead of `str(e)`)
 - **Import Organization**: Standardized import order across all source files
   - Grouped imports: standard library, third-party, local modules
   - Sorted imports alphabetically within groups per PEP 8
