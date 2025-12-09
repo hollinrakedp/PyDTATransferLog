@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Import Organization**: Standardized import order across all source files
+  - Grouped imports: standard library, third-party, local modules
+  - Sorted imports alphabetically within groups per PEP 8
+  - Removed unused imports throughout codebase
+  - Added blank lines between import groups
 - Updated "Import Request" button tooltip to reflect support for multiple file formats
 - Enhanced file import workflow with improved error handling and user feedback
 - File dialog now supports "Request Files (*.csv);;Text Files (*.txt);;All Files (*)"

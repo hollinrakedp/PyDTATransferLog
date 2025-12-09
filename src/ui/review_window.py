@@ -1,14 +1,28 @@
-import os
 import datetime
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QComboBox, QPushButton, QSplitter, QTreeWidget,
-                               QTreeWidgetItem, QLineEdit, QHeaderView,
-                               QFileDialog, QMessageBox, QDateEdit)
-from PySide6.QtCore import Qt, QDate
+import os
+
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtGui import QAction, QIcon
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDateEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from constants import TRANSFER_LOG_HEADERS
-from utils.file_utils import get_file_size_str
 from models.review_model import ReviewModel
+from utils.file_utils import get_file_size_str
 
 
 class TransferLogReviewerTab(QWidget):

@@ -1,17 +1,17 @@
-import os
 import csv
-from typing import List, Optional, Dict
+import os
+
 from constants import FILE_LIST_HEADERS
-from utils.file_utils import format_filename, format_display_path
-from utils.file_list_writer import save_file_list_with_progress
 from models.base_model import BaseLogModel
+from utils.file_list_writer import save_file_list_with_progress
+from utils.file_utils import format_display_path, format_filename
 
 
 class TransferLog(BaseLogModel):
     """Class representing a transfer log entry"""
 
     def __init__(self, config, timestamp, transfer_date, username, computer_name,
-                 media_type, media_id, transfer_type, source, destination, 
+                 media_type, media_id, transfer_type, source, destination,
                  request_id="", file_count=0, total_size=0):
         super().__init__(config, timestamp, computer_name, file_count, total_size)
         self.log_dir = self.config.get("Logging", "OutputFolder", fallback="./logs")
@@ -27,7 +27,7 @@ class TransferLog(BaseLogModel):
         self.destination = destination
         self.request_id = request_id
 
-    def save(self, log_dir: str, files: List[str], file_hashes: Optional[Dict[str, str]] = None) -> str:
+    def save(self, log_dir: str, files: list[str], file_hashes: dict[str, str] | None = None) -> str:
         """Save the transfer log to CSV format with archive processing"""
         # Get the transfer log filename template from config
         template = self.config.get("Logging", "TransferLogName",
@@ -89,8 +89,8 @@ class TransferLog(BaseLogModel):
 
         return file_list_path
 
-    def _save_file_list(self, log_dir: str, files: List[str],
-                        file_hashes: Optional[Dict[str, str]] = None,
+    def _save_file_list(self, log_dir: str, files: list[str],
+                        file_hashes: dict[str, str] | None = None,
                         progress_signal=None, cancel_check=None) -> str:
         """Save detailed file list with archive contents to CSV with optional progress reporting
 
@@ -100,8 +100,8 @@ class TransferLog(BaseLogModel):
         # Delegate to the unified method (kept as _save_file_list_with_progress for compatibility)
         return self._save_file_list_with_progress(log_dir, files, file_hashes, progress_signal, cancel_check)
 
-    def _save_file_list_with_progress(self, log_dir: str, files: List[str],
-                                 file_hashes: Optional[Dict[str, str]] = None,
+    def _save_file_list_with_progress(self, log_dir: str, files: list[str],
+                                 file_hashes: dict[str, str] | None = None,
                                  progress_signal=None, cancel_check=None) -> str:
         """Save detailed file list with archive contents to CSV with progress reporting"""
         # Get filename template from config

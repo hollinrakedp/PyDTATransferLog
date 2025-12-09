@@ -1,8 +1,9 @@
-import os
 import csv
 import datetime
-from typing import List, Dict, Any, Tuple, Optional
+import os
+
 from PySide6.QtCore import QDate
+
 
 class ReviewModel:
     """Model for reviewing transfer logs"""
@@ -10,7 +11,7 @@ class ReviewModel:
     def __init__(self, config):
         self.config = config
 
-    def load_log_data(self, log_dir: str) -> List[List[str]]:
+    def load_log_data(self, log_dir: str) -> list[list[str]]:
         """Load all log files from the log directory"""
         all_log_entries = []
 
@@ -32,7 +33,7 @@ class ReviewModel:
         # Process all log files and collect entries
         for log_file in log_files:
             try:
-                with open(log_file, 'r', newline='', encoding='utf-8') as f:
+                with open(log_file, newline='', encoding='utf-8') as f:
                     reader = csv.reader(f)
                     try:
                         next(reader)  # Skip header row
@@ -45,12 +46,12 @@ class ReviewModel:
 
         return all_log_entries
 
-    def load_file_details(self, file_list_path: str) -> Tuple[List[str], List[List[str]]]:
+    def load_file_details(self, file_list_path: str) -> tuple[list[str], list[list[str]]]:
         """Load details from a specific file list CSV"""
         if not os.path.exists(file_list_path):
             raise FileNotFoundError(f"File list {file_list_path} not found")
 
-        with open(file_list_path, 'r', newline='', encoding='utf-8') as f:
+        with open(file_list_path, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             try:
                 headers = next(reader)
@@ -59,12 +60,12 @@ class ReviewModel:
             rows = list(reader)
             return headers, rows
 
-    def filter_entries(self, entries: List[List[str]], 
-                       start_date: Optional[QDate] = None, 
-                       end_date: Optional[QDate] = None,
-                       field_index: Optional[int] = None, 
-                       filter_value: Optional[str] = None,
-                       search_text: Optional[str] = None) -> List[List[str]]:
+    def filter_entries(self, entries: list[list[str]],
+                       start_date: QDate | None = None,
+                       end_date: QDate | None = None,
+                       field_index: int | None = None,
+                       filter_value: str | None = None,
+                       search_text: str | None = None) -> list[list[str]]:
         """Apply filters to log entries"""
         filtered = entries
 
@@ -103,7 +104,7 @@ class ReviewModel:
         except (ValueError, TypeError):
             return False
 
-    def get_unique_values(self, entries: List[List[str]], field_index: int) -> List[str]:
+    def get_unique_values(self, entries: list[list[str]], field_index: int) -> list[str]:
         """Get unique values for a specific field"""
         unique_values = set()
         for entry in entries:
@@ -113,7 +114,7 @@ class ReviewModel:
                     unique_values.add(value)
         return sorted(unique_values)
 
-    def sort_entries(self, entries: List[List[str]], column: int, reverse: bool = False) -> None:
+    def sort_entries(self, entries: list[list[str]], column: int, reverse: bool = False) -> None:
         """Sort entries in place based on column and order"""
 
         def sort_key(entry):
@@ -141,7 +142,7 @@ class ReviewModel:
 
         entries.sort(key=sort_key, reverse=reverse)
 
-    def paginate_entries(self, entries: List[List[str]], page: int, page_size: int) -> List[List[str]]:
+    def paginate_entries(self, entries: list[list[str]], page: int, page_size: int) -> list[list[str]]:
         """Get a slice of entries for the current page"""
         if page_size <= 0: # "All" or invalid
             return entries
@@ -156,7 +157,7 @@ class ReviewModel:
             return 1
         return max(1, (total_entries + page_size - 1) // page_size)
 
-    def export_data(self, file_path: str, headers: List[str], data: List[List[str]]) -> None:
+    def export_data(self, file_path: str, headers: list[str], data: list[list[str]]) -> None:
         """Export data to CSV"""
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)

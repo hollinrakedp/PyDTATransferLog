@@ -1,9 +1,11 @@
 """Shared UI widgets for the PyDTATransferLog application"""
 
 import os
-from PySide6.QtWidgets import QListWidget
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPainter, QPen, QDragEnterEvent, QDragMoveEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QPainter, QPen
+from PySide6.QtWidgets import QListWidget
+
 from utils.file_utils import get_all_files
 
 
@@ -97,7 +99,7 @@ class DragDropFileListWidget(QListWidget):
                     if self.main_window._add_file(file):
                         added_count += 1
             except Exception as e:
-                self.main_window.app.set_status_message(f"Error scanning folder: {str(e)}")
+                self.main_window.app.set_status_message(f"Error scanning folder: {e!s}")
 
         # Update file count
         self.main_window._update_file_stats()

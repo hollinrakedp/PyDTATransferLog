@@ -1,22 +1,37 @@
+import csv
 import datetime
+import getpass
 import os
 import socket
-import sys
 import subprocess
-import csv
-import getpass
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QComboBox, QPushButton,
-                               QDateEdit, QFileDialog, QMessageBox, QListWidget,
-                               QSizePolicy, QProgressDialog, QTreeWidget,
-                               QTreeWidgetItem, QCheckBox, QGroupBox, QSpacerItem)
-from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtGui import QIcon, QAction
-from utils.file_utils import calculate_file_hash, get_all_files, get_file_size_str
-from models.log_model import TransferLog
+import sys
+
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from constants import TRANSFER_LOG_HEADERS
-from ui.widgets import DragDropFileListWidget
+from models.log_model import TransferLog
 from ui.common_workers import FileHashWorker, FileProcessingWorker
+from ui.widgets import DragDropFileListWidget
+from utils.file_utils import get_all_files, get_file_size_str
 
 
 class FileTransferLoggerTab(QWidget):
@@ -322,7 +337,7 @@ class FileTransferLoggerTab(QWidget):
             return False
         except Exception as e:
             self.app.set_status_message(
-                f"Error adding file {file_path}: {str(e)}")
+                f"Error adding file {file_path}: {e!s}")
             return False
 
     def _add_combo_field(self, layout, label_text, options):
@@ -400,7 +415,7 @@ class FileTransferLoggerTab(QWidget):
                 else:  # Linux and other Unix-like
                     subprocess.call(['xdg-open', file_path])
             except Exception as e:
-                self.app.set_status_message(f"Error opening file: {str(e)}")
+                self.app.set_status_message(f"Error opening file: {e!s}")
 
     def _update_file_stats(self):
         """Update the file count and size display"""
@@ -464,7 +479,7 @@ class FileTransferLoggerTab(QWidget):
             if file_path in self.selected_files:
                 try:
                     self.total_size -= os.path.getsize(file_path)
-                except:
+                except (OSError, ValueError):
                     pass
                 self.selected_files.remove(file_path)
                 self.normalized_paths.remove(self._normalize_path(file_path))
@@ -509,8 +524,8 @@ class FileTransferLoggerTab(QWidget):
 
         # Open file dialog to select request file or file list
         file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select Request File or File List", 
+            self,
+            "Select Request File or File List",
             request_folder,
             "Request Files (*.csv);;Text Files (*.txt);;All files (*.*)"
         )
@@ -701,7 +716,7 @@ class FileTransferLoggerTab(QWidget):
                     return self._parse_text_file_list(file_path)
 
         except Exception as e:
-            print(f"Error auto-detecting file format: {str(e)}")
+            print(f"Error auto-detecting file format: {e!s}")
             # Default to text file parsing
             return self._parse_text_file_list(file_path)
 
@@ -711,7 +726,7 @@ class FileTransferLoggerTab(QWidget):
         file_list = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
                     original_line = line.rstrip('\r\n')
                     file_path_entry = original_line.strip()
@@ -742,7 +757,7 @@ class FileTransferLoggerTab(QWidget):
                             'File Hash': ''
                         })
                     except Exception as path_error:
-                        print(f"Warning: Could not process path on line {line_num}: '{original_line}' - {str(path_error)}")
+                        print(f"Warning: Could not process path on line {line_num}: '{original_line}' - {path_error!s}")
 
         except Exception as e:
             print(f"Error reading text file list: {e!s}")
@@ -765,7 +780,7 @@ class FileTransferLoggerTab(QWidget):
         # Look for the request log entry that references this file
         if os.path.exists(request_log_file):
             try:
-                with open(request_log_file, 'r', newline='', encoding='utf-8') as f:
+                with open(request_log_file, newline='', encoding='utf-8') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         logged_file_path = row.get('File Log', '').strip()
@@ -784,11 +799,11 @@ class FileTransferLoggerTab(QWidget):
                                 }
                                 break
             except Exception as e:
-                print(f"Error reading request log: {str(e)}")
+                print(f"Error reading request log: {e!s}")
 
         # Parse the file list from the CSV (this should work regardless of metadata)
         try:
-            with open(file_path, 'r', newline='', encoding='utf-8') as f:
+            with open(file_path, newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     # Only include level 0 files (top-level files, not archive contents)
@@ -801,7 +816,7 @@ class FileTransferLoggerTab(QWidget):
                             'File Hash': row.get('File Hash', '')
                         })
         except Exception as e:
-            print(f"Error reading request file list: {str(e)}")
+            print(f"Error reading request file list: {e!s}")
 
         return request_data, file_list
 
@@ -982,8 +997,8 @@ class FileTransferLoggerTab(QWidget):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Transfer log saved successfully to yearly CSV file.\n"
-                f"File list saved as CSV."
+                "Transfer log saved successfully to yearly CSV file.\n"
+                "File list saved as CSV."
             )
 
             # Success status bar
@@ -1096,6 +1111,6 @@ class FileTransferLoggerTab(QWidget):
                 QMessageBox.warning(self, "Reload Failed",
                                    "Failed to reload the configuration file.")
         except Exception as e:
-            self.app.set_status_message(f"Error reloading configuration: {str(e)}")
+            self.app.set_status_message(f"Error reloading configuration: {e!s}")
             QMessageBox.critical(self, "Error",
-                                f"Error reloading configuration: {str(e)}")
+                                f"Error reloading configuration: {e!s}")

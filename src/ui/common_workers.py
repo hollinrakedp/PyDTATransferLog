@@ -5,10 +5,10 @@ This module provides reusable QThread workers that can be used across different
 UI components (log_window.py and request_window.py).
 """
 
-import datetime
 import os
-import csv
+
 from PySide6.QtCore import QThread, Signal
+
 from utils.file_utils import calculate_file_hash
 
 
@@ -79,7 +79,7 @@ class FileProcessingWorker(QThread):
     progress = Signal(int)
     finished = Signal(str)
 
-    def __init__(self, model, files, file_hashes, base_log_dir, file_list_dir, 
+    def __init__(self, model, files, file_hashes, base_log_dir, file_list_dir,
                  save_callback=None):
         """
         Initialize the file processing worker.
@@ -119,9 +119,9 @@ class FileProcessingWorker(QThread):
             # Process the file list
             if not self.canceled:
                 file_list_path = self.model._save_file_list_with_progress(
-                    self.file_list_dir, 
-                    self.files, 
-                    self.file_hashes, 
+                    self.file_list_dir,
+                    self.files,
+                    self.file_hashes,
                     self.progress,
                     lambda: self.canceled
                 )
@@ -132,7 +132,7 @@ class FileProcessingWorker(QThread):
                     os.remove(file_list_path)
                     file_list_path = ""
                 except Exception as e:
-                    print(f"Error deleting file list after cancellation: {str(e)}")
+                    print(f"Error deleting file list after cancellation: {e!s}")
 
             # Create the transfer log entry if not canceled and callback provided
             if file_list_path and not self.canceled and self.save_callback:
@@ -142,8 +142,8 @@ class FileProcessingWorker(QThread):
 
                 # Call the model-specific save callback
                 self.save_callback(
-                    self.base_log_dir, 
-                    formatted_timestamp, 
+                    self.base_log_dir,
+                    formatted_timestamp,
                     file_list_path
                 )
 
@@ -151,7 +151,7 @@ class FileProcessingWorker(QThread):
             self.finished.emit(file_list_path)
 
         except Exception as e:
-            print(f"Error in file processing worker: {str(e)}")
+            print(f"Error in file processing worker: {e!s}")
             # If error occurs and we created a file list, try to delete it
             if file_list_path and os.path.exists(file_list_path):
                 try:

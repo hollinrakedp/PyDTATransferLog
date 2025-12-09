@@ -1,22 +1,34 @@
 import datetime
+import getpass
 import os
 import socket
 import subprocess
 import sys
-import getpass
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton,
-                               QDateEdit, QFileDialog, QMessageBox, QListWidget,
-                               QSizePolicy, QProgressDialog, QTreeWidget,
-                               QTreeWidgetItem, QCheckBox, QGroupBox, QSpacerItem,
-                               QTextEdit, QApplication)
-from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtGui import QIcon, QAction
-from utils.file_utils import calculate_file_hash, get_all_files, get_file_size_str
+
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDateEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 from models.request_model import RequestLog
-from constants import REQUEST_FILE_LIST_HEADERS
-from ui.widgets import DragDropFileListWidget
 from ui.common_workers import FileHashWorker, FileProcessingWorker
+from ui.widgets import DragDropFileListWidget
+from utils.file_utils import get_all_files, get_file_size_str
 
 
 class FileTransferRequestTab(QWidget):
@@ -272,7 +284,7 @@ class FileTransferRequestTab(QWidget):
                 self._update_file_stats()
                 self.app.set_status_message(f"Added {added_count} files from folder")
             except Exception as e:
-                QMessageBox.warning(self, "Error", f"Error scanning folder: {str(e)}")
+                QMessageBox.warning(self, "Error", f"Error scanning folder: {e!s}")
                 self.app.set_status_message("Error scanning folder")
 
     def _add_file(self, file_path):
@@ -304,7 +316,7 @@ class FileTransferRequestTab(QWidget):
 
             return True
         except Exception as e:
-            self.app.set_status_message(f"Error adding file {file_path}: {str(e)}")
+            self.app.set_status_message(f"Error adding file {file_path}: {e!s}")
             return False
 
     def _normalize_path(self, path):
@@ -495,7 +507,7 @@ class FileTransferRequestTab(QWidget):
                     else:  # Linux and other Unix-like
                         subprocess.call(['xdg-open', file_list_path])
                 except Exception as e:
-                    self.app.set_status_message(f"Error opening file: {str(e)}")
+                    self.app.set_status_message(f"Error opening file: {e!s}")
 
             self.app.set_status_message("Request created successfully")
         else:
@@ -521,5 +533,5 @@ class FileTransferRequestTab(QWidget):
                 QMessageBox.warning(self, "Error", "Failed to reload configuration file")
                 self.app.set_status_message("Configuration reload failed")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error reloading configuration: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Error reloading configuration: {e!s}")
             self.app.set_status_message("Configuration reload error")

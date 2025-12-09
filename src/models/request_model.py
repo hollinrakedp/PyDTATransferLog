@@ -1,8 +1,9 @@
-import os
 import csv
+import os
+
 from constants import REQUEST_FILE_LIST_HEADERS, REQUEST_LOG_HEADERS
-from utils.file_list_writer import save_file_list_with_progress
 from models.base_model import BaseLogModel
+from utils.file_list_writer import save_file_list_with_progress
 
 
 class RequestLog(BaseLogModel):

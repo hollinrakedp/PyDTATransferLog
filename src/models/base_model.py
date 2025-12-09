@@ -1,5 +1,6 @@
-from typing import List
+
 from utils.file_utils import FileInfo, get_file_size_str
+
 
 class BaseLogModel:
     """Base class for transfer and request logs"""
@@ -10,7 +11,7 @@ class BaseLogModel:
         self.computer_name = computer_name
         self.file_count = file_count
         self.total_size = total_size
-        self.files: List[FileInfo] = []
+        self.files: list[FileInfo] = []
 
     def add_file(self, file_info: FileInfo):
         """Add a file to the log"""
