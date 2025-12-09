@@ -100,6 +100,9 @@ def test_main_returns_early_on_help(monkeypatch):
 
 @pytest.mark.gui
 def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
+    import sys
+    from unittest.mock import MagicMock
+    
     # Force GUI path (no CLI args, help returns False)
     monkeypatch.setattr(sys, "argv", ["prog"])  # triggers GUI path
     monkeypatch.setattr(main, "check_for_help_request", lambda: False)
@@ -145,8 +148,6 @@ def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
             return 0
 
     # Patch PySide6.QtWidgets module before it's imported
-    import sys
-    from unittest.mock import MagicMock
     mock_qtwidgets = MagicMock()
     mock_qtwidgets.QApplication = DummyApp
     sys.modules['PySide6.QtWidgets'] = mock_qtwidgets

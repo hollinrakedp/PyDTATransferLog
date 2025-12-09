@@ -148,11 +148,17 @@ def main():
     if check_for_help_request():
         return
 
-    # Handle --version and -V flags before any imports or directory changes
-    if len(sys.argv) > 1 and sys.argv[1] in ["-V", "--version"]:
-        from version import VERSION
-        print(VERSION)
-        return
+    # Handle --version, -V, --help, and -h flags before any imports or directory changes
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ["-V", "--version"]:
+            from version import VERSION
+            print(VERSION)
+            return
+        elif sys.argv[1] in ["-h", "--help"]:
+            # Let argparse handle it without Qt imports
+            parser = create_gui_parser()
+            parser.print_help()
+            return
 
     # Store original working directory before changing it
     original_cwd = os.getcwd()
