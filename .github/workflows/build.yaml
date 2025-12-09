@@ -89,29 +89,29 @@ jobs:
       - name: Test executable permissions and structure  
         run: |
           python -c "
-import os
-import sys
-
-# Check main entry points exist
-assert os.path.exists('src/main.py'), 'main.py not found'
-assert os.path.exists('src/config.ini'), 'config.ini not found'
-assert os.path.exists('main.spec'), 'main.spec not found'
-
-# Check key modules exist
-key_files = [
-    'src/models/log_model.py',
-    'src/models/request_model.py', 
-    'src/ui/app_window.py',
-    'src/ui/log_window.py',
-    'src/ui/request_window.py',
-    'src/utils/config_manager.py',
-    'src/utils/file_utils.py'
-]
-
-for file in key_files:
-    assert os.path.exists(file), f'{file} not found'
-
-print('✅ All required files present')
+          import os
+          import sys
+          
+          # Check main entry points exist
+          assert os.path.exists('src/main.py'), 'main.py not found'
+          assert os.path.exists('src/config.ini'), 'config.ini not found'
+          assert os.path.exists('main.spec'), 'main.spec not found'
+          
+          # Check key modules exist
+          key_files = [
+              'src/models/log_model.py',
+              'src/models/request_model.py', 
+              'src/ui/app_window.py',
+              'src/ui/log_window.py',
+              'src/ui/request_window.py',
+              'src/utils/config_manager.py',
+              'src/utils/file_utils.py'
+          ]
+          
+          for file in key_files:
+              assert os.path.exists(file), f'{file} not found'
+          
+          print('✅ All required files present')
           "
 
       - name: Clean up test files
