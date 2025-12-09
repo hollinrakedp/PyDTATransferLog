@@ -102,7 +102,15 @@ class TestCrossPlatformPaths:
         for path in test_paths:
             normalized = os.path.normpath(os.path.abspath(path))
             assert os.path.isabs(normalized)
-            assert "\\" not in normalized or "/" not in normalized  # Should be consistent
+            # On Windows, paths use backslashes; on Unix, they use forward slashes
+            # Note: On Unix, backslashes in input paths are treated as literal characters,
+            # not path separators, so os.path.normpath won't convert them
+            if os.name == 'nt':  # Windows
+                assert "/" not in normalized, f"Windows path should use backslashes: {normalized}"
+            else:  # Unix/Linux
+                # Only check paths that don't have backslashes in the input
+                if "\\" not in path:
+                    assert "\\" not in normalized, f"Unix path should use forward slashes: {normalized}"
     
     def test_path_joining(self):
         """Test that path joining works cross-platform"""
