@@ -211,10 +211,51 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
+      - name: Set up Python
+        if: matrix.os != 'rhel9'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Python on RHEL9
+        if: matrix.os == 'rhel9'
+        shell: bash
+        run: |
+          PYTHON_CMD="python${{ env.PYTHON_VERSION }}"
+
+          # Ensure EPEL repository
+          if ! dnf repolist enabled | grep -q epel; then
+            echo "Installing EPEL repository..."
+            sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+          else
+            echo "EPEL repository is already available"
+          fi
+
+          # Check if Python is already installed
+          if ! command -v $PYTHON_CMD &> /dev/null; then
+            echo "Installing Python ${{ env.PYTHON_VERSION }}..."
+            sudo dnf install -y python${{ env.PYTHON_VERSION }} python${{ env.PYTHON_VERSION }}-pip python${{ env.PYTHON_VERSION }}-devel
+          else
+            echo "Python ${{ env.PYTHON_VERSION }} is already installed"
+          fi
+          $PYTHON_CMD --version
+
+          # Create and activate virtual environment
+          $PYTHON_CMD -m venv venv
+          source venv/bin/activate
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+          echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
+
       - name: Extract version
         id: version
-        shell: python
+        shell: bash
         run: |
+          python_cmd="python"
+          if [[ "${{ matrix.os }}" == "rhel9" ]]; then
+            python_cmd="python${{ env.PYTHON_VERSION }}"
+          fi
+          
+          $python_cmd << 'EOF'
           import os
           import re
           import subprocess
@@ -254,41 +295,7 @@ jobs:
           write_output('commit_short', commit_short)
 
           print(f"Version: {version} (short: {version_short}, commit: {commit_short})")
-
-      - name: Set up Python
-        if: matrix.os != 'rhel9'
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup Python on RHEL9
-        if: matrix.os == 'rhel9'
-        shell: bash
-        run: |
-          PYTHON_CMD="python${{ env.PYTHON_VERSION }}"
-
-          # Ensure EPEL repository
-          if ! dnf repolist enabled | grep -q epel; then
-            echo "Installing EPEL repository..."
-            sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-          else
-            echo "EPEL repository is already available"
-          fi
-
-          # Check if Python is already installed
-          if ! command -v $PYTHON_CMD &> /dev/null; then
-            echo "Installing Python ${{ env.PYTHON_VERSION }}..."
-            sudo dnf install -y python${{ env.PYTHON_VERSION }} python${{ env.PYTHON_VERSION }}-pip python${{ env.PYTHON_VERSION }}-devel
-          else
-            echo "Python ${{ env.PYTHON_VERSION }} is already installed"
-          fi
-          $PYTHON_CMD --version
-
-          # Create and activate virtual environment
-          $PYTHON_CMD -m venv venv
-          source venv/bin/activate
-          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
-          echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
+          EOF
 
       - name: Install dependencies
         shell: bash
