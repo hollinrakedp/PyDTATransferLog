@@ -365,15 +365,14 @@ jobs:
           echo "Testing built executable..."
           
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Test GUI executable
+            # Test GUI executable (version only to avoid opening windows)
             if [[ -f "./dist/dtatransferlog.exe" ]]; then
               ./dist/dtatransferlog.exe --version
-              ./dist/dtatransferlog.exe --help
             else
               echo "ERROR: dtatransferlog.exe not found in dist/"
               exit 1
             fi
-            # Test CLI executable
+            # Test CLI executable (supports --help safely)
             if [[ -f "./dist/dtatransferlog-cli.exe" ]]; then
               ./dist/dtatransferlog-cli.exe --version
               ./dist/dtatransferlog-cli.exe --help
@@ -382,11 +381,10 @@ jobs:
               exit 1
             fi
           else
-            # Test executable with offscreen Qt platform
+            # Test Linux/RHEL executable (version only to avoid GUI)
             if [[ -f "./dist/dtatransferlog" ]]; then
               chmod +x ./dist/dtatransferlog
               ./dist/dtatransferlog --version
-              ./dist/dtatransferlog --help
             else
               echo "ERROR: dtatransferlog not found in dist/"
               exit 1
