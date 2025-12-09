@@ -87,6 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Specified exception types in error handling for improved clarity
   - Replaced `os.getlogin()` with `getpass.getuser()` for username retrieval
   - Removed unused import of `QDir`
+
+### Documentation
+
+- Enhanced Copilot instructions with comprehensive testing and development guidelines
+  - Added CLI testing framework with transfer and request mode examples
+  - Added cross-platform compatibility guidelines for path handling
+  - Added testing methodology section with GitHub Actions integration details
+  - Added path resolution behavior documentation (CLI vs config differences)
+  - Added post-execution validation checklist
+  - Added error handling validation requirements
+- Added request import feature documentation (`docs/request-import-feature.md`)
 - **File Processing**:
   - Consolidated file processing and hashing functionality into common worker classes
   - Moved drag-and-drop functionality to a reusable widget
