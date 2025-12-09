@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added mypy strict mode settings with `ignore-missing-imports`
   - Added VSCode pytest discovery configuration
   - Updated `.gitignore` to exclude coverage files (`.coverage`)
+- **Test Infrastructure**: Comprehensive test suite with modern organization
+  - Reorganized tests into `tests/integration/` and `tests/unit/` hierarchy
+  - Added pytest configuration with markers for test categorization (integration, unit, gui, cli)
+  - Created comprehensive test documentation in `tests/README.md`
+  - Added shared pytest fixtures in `tests/conftest.py`
+  - Created 70 automated tests covering CLI, GUI, and cross-platform functionality:
+    - 16 integration tests for end-to-end workflows
+    - 54 unit tests for models, utilities, and CLI handlers
+  - Added unit tests for: constants, CLI handlers, main module, models (base, log, request, review)
+  - Added unit tests for utilities: archive, CLI utils, config manager, file list writer, file utils
 - **Build & CI/CD Infrastructure**: Comprehensive testing and build improvements
   - Enhanced GitHub Actions workflow with multi-OS and multi-Python version testing (3.10-3.13)
   - Added test matrix: Windows Latest and Ubuntu Latest across all Python versions
