@@ -132,7 +132,7 @@ def save_file_list_with_progress(
                                 progress_callback.emit(progress)
                         except Exception as e:
                             # If progress update fails, just continue
-                            print(f"Progress update failed: {str(e)}")
+                            print(f"Progress update failed: {e!s}")
 
         return file_list_path
 
