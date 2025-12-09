@@ -110,7 +110,7 @@ jobs:
           for file in key_files:
               assert os.path.exists(file), f'{file} not found'
           
-          print('✅ All required files present')
+          print('[OK] All required files present')
           "
 
       - name: Clean up test files
