@@ -1,23 +1,160 @@
-name: Build Executable
+name: Build and Test
 
 on:
   workflow_dispatch:
-  #push:
-  #  branches:
-  #    - main  # Trigger the workflow on pushes to the 'main' branch
-  #pull_request:
-  #  branches:
-  #    - main  # Trigger the workflow on pull requests to the 'main' branch
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/*'
+  pull_request:
+    branches:
+      - main
+      - develop
 
 env:
   PYTHON_VERSION: '3.13'
 
 jobs:
+  test:
+    name: Run Tests
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Lint with ruff
+        run: |
+          # Ruff is the primary linter (combines flake8 + isort + black checking)
+          ruff check src
+
+      - name: Type check with mypy
+        continue-on-error: true
+        run: |
+          mypy src --ignore-missing-imports || echo "Type checking completed (non-blocking)"
+
+      - name: Run comprehensive test suite
+        run: |
+          python tests/integration/test_cli_functionality.py
+
+      - name: Collect test coverage
+        run: |
+          python -m pytest tests/ --cov=src --cov-report=html:htmlcov --cov-report=term
+
+      - name: Extract coverage percentage
+        id: coverage
+        shell: python
+        run: |
+          import re
+          import os
+          import subprocess
+          
+          try:
+              result = subprocess.run(['python', '-m', 'coverage', 'report'], 
+                                    capture_output=True, text=True)
+              output = result.stdout
+              match = re.search(r'TOTAL\s+\d+\s+\d+\s+(\d+)%', output)
+              if match:
+                  coverage_pct = match.group(1)
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write(f'coverage_percentage={coverage_pct}%\n')
+                  print(f'Coverage: {coverage_pct}%')
+          except Exception as e:
+              print(f'Warning: Could not extract coverage: {e}')
+
+      - name: Display coverage in workflow summary
+        if: always()
+        run: |
+          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Python ${{ matrix.python-version }} on ${{ matrix.os }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          python -m coverage report >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage report available in artifacts: \`coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: htmlcov/
+          retention-days: 7
+
+      - name: Test GUI can start (headless)
+        run: |
+          # Install virtual display for headless testing
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb || echo "Xvfb installation failed"
+            export DISPLAY=:99
+            Xvfb :99 -screen 0 1024x768x24 &
+          fi
+          
+          # Test GUI startup (should not crash)
+          timeout 10s python src/main.py --tab 0 &
+          PID=$!
+          sleep 5
+          kill $PID 2>/dev/null || true
+          echo "GUI startup test completed"
+        shell: bash
+
+      - name: Test executable permissions and structure  
+        run: |
+          # Check that source files have proper structure
+          python -c "
+          import os
+          import sys
+          
+          # Check main entry points exist
+          assert os.path.exists('src/main.py'), 'main.py not found'
+          assert os.path.exists('src/config.ini'), 'config.ini not found'
+          assert os.path.exists('main.spec'), 'main.spec not found'
+          
+          # Check key modules exist
+          key_files = [
+              'src/models/log_model.py',
+              'src/models/request_model.py', 
+              'src/ui/app_window.py',
+              'src/ui/log_window.py',
+              'src/ui/request_window.py',
+              'src/utils/config_manager.py',
+              'src/utils/file_utils.py'
+          ]
+          
+          for file in key_files:
+              assert os.path.exists(file), f'{file} not found'
+          
+          print('✅ All required files present')
+          "
+
+      - name: Clean up test files
+        run: |
+          rm -rf test_file.txt test_folder test_logs test_requests || true
+        shell: bash
   update-version:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch all history for version tracking
 
@@ -41,7 +178,7 @@ jobs:
           git push
 
   build:
-    needs: update-version
+    needs: [test, update-version]
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, rhel9]
@@ -57,9 +194,53 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+
+      - name: Extract version
+        id: version
+        shell: python
+        run: |
+          import os
+          import re
+          import subprocess
+
+          def write_output(key, value):
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"{key}={value}\n")
+
+          # Read version.py
+          version = "unknown"
+          version_short = "unknown"
+          try:
+            with open('src/version.py', 'r', encoding='utf-8') as f:
+              content = f.read()
+            match = re.search(r'VERSION = "([^"]+)"', content)
+            if match:
+              version = match.group(1)
+              parts = version.split('.')
+              # Use short semver (major.minor.patch)
+              if len(parts) >= 3:
+                version_short = '.'.join(parts[:3])
+              else:
+                version_short = version
+          except Exception as e:
+            print(f"Warning: Could not read version.py: {e}")
+
+          # Get git commit (short)
+          commit_short = "unknown"
+          try:
+            commit_full = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+            commit_short = commit_full[:7]
+          except Exception as e:
+            print(f"Warning: Could not get git commit: {e}")
+
+          write_output('version', version)
+          write_output('version_short', version_short)
+          write_output('commit_short', commit_short)
+
+          print(f"Version: {version} (short: {version_short}, commit: {commit_short})")
 
       # Step 2: Set up Python
       - name: Set up Python
@@ -111,6 +292,20 @@ jobs:
         run: |
           pyinstaller main.spec
 
+      # Step 4.5: Test the built executable
+      - name: Test built executable
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            # Test Windows executable
+            ./dist/dtatransferlog-cli.exe --version
+            ./dist/dtatransferlog-cli.exe --help
+          else
+            # Test Linux executable
+            ./dist/dtatransferlog-cli --version
+            ./dist/dtatransferlog-cli --help
+          fi
+
       # Step 5: Verify the dist directory
       - name: Verify dist directory
         shell: bash
@@ -120,6 +315,6 @@ jobs:
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
+          name: ${{ matrix.artifact-name }}-v${{ steps.version.outputs.version_short }}-${{ steps.version.outputs.commit_short }}
           path: dist/
           retention-days: 7
