@@ -125,7 +125,7 @@ def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
 
     monkeypatch.setattr(main, "ConfigManager", lambda _path: DummyConfig())
 
-    # Dummy QApplication
+    # Dummy QApplication - patch it in PySide6.QtWidgets namespace
     class DummyApp:
         _instance = None
 
@@ -144,7 +144,12 @@ def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
         def exec(self):
             return 0
 
-    monkeypatch.setattr(main, "QApplication", DummyApp)
+    # Patch PySide6.QtWidgets module before it's imported
+    import sys
+    from unittest.mock import MagicMock
+    mock_qtwidgets = MagicMock()
+    mock_qtwidgets.QApplication = DummyApp
+    sys.modules['PySide6.QtWidgets'] = mock_qtwidgets
 
     # Dummy app window with tab_widget
     class DummyTabs:
@@ -162,7 +167,10 @@ def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
         def show(self):
             pass
 
-    monkeypatch.setattr(main, "DTATransferLogApp", DummyAppWindow)
+    # Patch ui.app_window module before it's imported
+    mock_app_window = MagicMock()
+    mock_app_window.DTATransferLogApp = DummyAppWindow
+    sys.modules['ui.app_window'] = mock_app_window
 
     # Fake theme file existence and contents
     monkeypatch.setattr(os.path, "exists", lambda path: path.endswith("fake-theme.qss"))

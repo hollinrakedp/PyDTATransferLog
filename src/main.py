@@ -148,6 +148,12 @@ def main():
     if check_for_help_request():
         return
 
+    # Handle --version and -V flags before any imports or directory changes
+    if len(sys.argv) > 1 and sys.argv[1] in ["-V", "--version"]:
+        from version import VERSION
+        print(VERSION)
+        return
+
     # Store original working directory before changing it
     original_cwd = os.getcwd()
 
