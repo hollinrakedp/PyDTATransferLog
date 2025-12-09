@@ -128,7 +128,7 @@ class DragDropFileListWidget(QListWidget):
             painter.setFont(font)
 
             # Draw icon
-            icon_text = "📁➕"  # ruff: noqa: RUF001 - intentional UI glyph
+            icon_text = "📁➕"  # noqa: RUF001 - intentional UI glyph
             text = "Drag and drop files or folders here"
 
             painter.drawText(
