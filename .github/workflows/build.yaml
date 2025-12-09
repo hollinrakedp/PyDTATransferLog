@@ -16,8 +16,37 @@ env:
   PYTHON_VERSION: '3.13'
 
 jobs:
-  test:
-    name: Run Tests
+  # Job 1: Linting and type checking (Windows only, Python 3.13)
+  # Code quality checks are identical regardless of OS, so run once
+  lint-and-check:
+    name: Lint and Type Check
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint with ruff
+        run: ruff check src
+
+      - name: Type check with mypy
+        run: mypy src --ignore-missing-imports
+
+  # Job 2: CLI and utility testing (Windows + Ubuntu, all Python versions)
+  # Tests CLI functionality and non-GUI code
+  test-cli:
+    name: Test CLI
+    needs: lint-and-check
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -40,123 +69,108 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      - name: Lint with ruff
+      - name: Run CLI tests (exclude GUI tests)
         run: |
-          # Ruff is the primary linter (combines flake8 + isort + black checking)
-          ruff check src
+          python -m pytest tests/ -m 'not gui' -v
 
-      - name: Type check with mypy
-        continue-on-error: true
+      - name: Collect test coverage (Windows only)
+        if: runner.os == 'Windows'
         run: |
-          mypy src --ignore-missing-imports || echo "Type checking completed (non-blocking)"
+          python -m pytest tests/ -m 'not gui' --cov=src --cov-report=html:htmlcov --cov-report=term
 
-      - name: Run comprehensive test suite
-        run: |
-          python tests/integration/test_cli_functionality.py
-
-      - name: Collect test coverage
-        run: |
-          python -m pytest tests/ --cov=src --cov-report=html:htmlcov --cov-report=term
-
-      - name: Extract coverage percentage
-        id: coverage
-        shell: python
-        run: |
-          import re
-          import os
-          import subprocess
-          
-          try:
-              result = subprocess.run(['python', '-m', 'coverage', 'report'], 
-                                    capture_output=True, text=True)
-              output = result.stdout
-              match = re.search(r'TOTAL\s+\d+\s+\d+\s+(\d+)%', output)
-              if match:
-                  coverage_pct = match.group(1)
-                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                      f.write(f'coverage_percentage={coverage_pct}%\n')
-                  print(f'Coverage: {coverage_pct}%')
-          except Exception as e:
-              print(f'Warning: Could not extract coverage: {e}')
-
-      - name: Display coverage in workflow summary
-        if: always()
-        run: |
-          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Python ${{ matrix.python-version }} on ${{ matrix.os }}**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          python -m coverage report >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Coverage report available in artifacts: \`coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}\`" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload coverage report
-        if: always()
+      - name: Upload coverage report (Windows only)
+        if: runner.os == 'Windows' && always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
           path: htmlcov/
           retention-days: 7
 
-      - name: Test GUI can start (headless)
-        run: |
-          # Install virtual display for headless testing
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y xvfb || echo "Xvfb installation failed"
-            export DISPLAY=:99
-            Xvfb :99 -screen 0 1024x768x24 &
-          fi
-          
-          # Test GUI startup (should not crash)
-          timeout 10s python src/main.py --tab 0 &
-          PID=$!
-          sleep 5
-          kill $PID 2>/dev/null || true
-          echo "GUI startup test completed"
-        shell: bash
-
       - name: Test executable permissions and structure  
         run: |
-          # Check that source files have proper structure
           python -c "
-          import os
-          import sys
-          
-          # Check main entry points exist
-          assert os.path.exists('src/main.py'), 'main.py not found'
-          assert os.path.exists('src/config.ini'), 'config.ini not found'
-          assert os.path.exists('main.spec'), 'main.spec not found'
-          
-          # Check key modules exist
-          key_files = [
-              'src/models/log_model.py',
-              'src/models/request_model.py', 
-              'src/ui/app_window.py',
-              'src/ui/log_window.py',
-              'src/ui/request_window.py',
-              'src/utils/config_manager.py',
-              'src/utils/file_utils.py'
-          ]
-          
-          for file in key_files:
-              assert os.path.exists(file), f'{file} not found'
-          
-          print('✅ All required files present')
+import os
+import sys
+
+# Check main entry points exist
+assert os.path.exists('src/main.py'), 'main.py not found'
+assert os.path.exists('src/config.ini'), 'config.ini not found'
+assert os.path.exists('main.spec'), 'main.spec not found'
+
+# Check key modules exist
+key_files = [
+    'src/models/log_model.py',
+    'src/models/request_model.py', 
+    'src/ui/app_window.py',
+    'src/ui/log_window.py',
+    'src/ui/request_window.py',
+    'src/utils/config_manager.py',
+    'src/utils/file_utils.py'
+]
+
+for file in key_files:
+    assert os.path.exists(file), f'{file} not found'
+
+print('✅ All required files present')
           "
 
       - name: Clean up test files
         run: |
-          rm -rf test_file.txt test_folder test_logs test_requests || true
+          rm -rf test_file.txt test_folder test_logs test_requests 2>/dev/null || true
         shell: bash
+
+  # Job 3: GUI testing (Windows only, all Python versions)
+  # PySide6 tests require display server
+  test-gui:
+    name: Test GUI
+    needs: lint-and-check
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run GUI tests only
+        run: |
+          python -m pytest tests/ -m 'gui' -v
+
+      - name: Test GUI can start
+        run: |
+          # Test GUI startup with 5-second timeout
+          $process = Start-Process python -ArgumentList "src/main.py", "--tab", "0" -PassThru
+          Start-Sleep -Seconds 5
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          Write-Output "GUI startup test completed"
+        shell: powershell
+
+  # Job 4: Version update (main branch only)
+  # Only update version for commits to main branch
   update-version:
-    needs: test
+    name: Update Version
+    needs: [test-cli, test-gui]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for version tracking
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -173,12 +187,15 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add version.txt src/version.py
-          # Only commit if there are changes
           git diff --staged --quiet || git commit -m "Auto-increment build number [skip ci]"
           git push
 
+  # Job 5: Build executables (Windows, Ubuntu, RHEL9)
+  # Depends on all testing completing
   build:
-    needs: [test, update-version]
+    name: Build Executable
+    needs: [lint-and-check, test-cli, test-gui, update-version]
+    if: always() && (needs.lint-and-check.result == 'success' && needs.test-cli.result == 'success' && needs.test-gui.result == 'success')
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, rhel9]
@@ -242,14 +259,12 @@ jobs:
 
           print(f"Version: {version} (short: {version_short}, commit: {commit_short})")
 
-      # Step 2: Set up Python
       - name: Set up Python
         if: matrix.os != 'rhel9'
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # Step 2: Setup Python (RHEL9, self-hosted)
       - name: Setup Python on RHEL9
         if: matrix.os == 'rhel9'
         shell: bash
@@ -279,39 +294,30 @@ jobs:
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
           echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
 
-      # Step 3: Install dependencies
       - name: Install dependencies
         shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-
-      # Step 4: Build the executable
       - name: Build executable with PyInstaller
-        run: |
-          pyinstaller main.spec
+        run: pyinstaller main.spec
 
-      # Step 4.5: Test the built executable
       - name: Test built executable
         shell: bash
         run: |
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Test Windows executable
             ./dist/dtatransferlog-cli.exe --version
             ./dist/dtatransferlog-cli.exe --help
           else
-            # Test Linux executable
             ./dist/dtatransferlog-cli --version
             ./dist/dtatransferlog-cli --help
           fi
 
-      # Step 5: Verify the dist directory
       - name: Verify dist directory
         shell: bash
         run: ls -la dist
 
-      # Step 6: Upload the executable as an artifact
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:

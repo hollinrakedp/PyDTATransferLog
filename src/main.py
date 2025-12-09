@@ -1,25 +1,15 @@
 import os
 import sys
 
-try:
-    from PySide6.QtGui import QFont
-    from PySide6.QtWidgets import (
-        QApplication,
-        QDialog,
-        QHBoxLayout,
-        QPushButton,
-        QTextEdit,
-        QVBoxLayout,
-    )
-except ImportError:
-    # Allow import in headless test environments lacking Qt libs; runtime will guard
-    QFont = None
-    QApplication = None
-    QDialog = None
-    QHBoxLayout = None
-    QPushButton = None
-    QTextEdit = None
-    QVBoxLayout = None
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QHBoxLayout,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 from cli.handlers import create_gui_parser, run_cli, run_request_cli
 from ui.app_window import DTATransferLogApp

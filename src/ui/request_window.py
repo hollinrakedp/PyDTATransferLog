@@ -5,46 +5,25 @@ import socket
 import subprocess
 import sys
 
-try:
-    from PySide6.QtCore import QDate, Qt
-    from PySide6.QtGui import QAction
-    from PySide6.QtWidgets import (
-        QApplication,
-        QCheckBox,
-        QDateEdit,
-        QFileDialog,
-        QHBoxLayout,
-        QLabel,
-        QLineEdit,
-        QMessageBox,
-        QProgressDialog,
-        QPushButton,
-        QSizePolicy,
-        QSpacerItem,
-        QTextEdit,
-        QVBoxLayout,
-        QWidget,
-    )
-except ImportError:
-    # Allow import in headless test environments lacking Qt libs
-    QDate = None
-    Qt = None
-    QAction = None
-    QApplication = None
-    QCheckBox = None
-    QDateEdit = None
-    QFileDialog = None
-    QHBoxLayout = None
-    QLabel = None
-    QLineEdit = None
-    QMessageBox = None
-    QProgressDialog = None
-    QPushButton = None
-    QSizePolicy = None
-    QSpacerItem = None
-    QTextEdit = None
-    QVBoxLayout = None
-    QWidget = None
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDateEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from models.request_model import RequestLog
 from ui.common_workers import FileHashWorker, FileProcessingWorker

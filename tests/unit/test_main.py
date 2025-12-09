@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 import main
 
 
@@ -16,6 +18,7 @@ def test_parse_tab_argument_variants(capsys):
     assert result == 0
 
 
+@pytest.mark.gui
 def test_check_for_help_request_triggers_gui(monkeypatch):
     calls = []
     monkeypatch.setattr(sys, "argv", ["prog", "--help"])
@@ -27,6 +30,7 @@ def test_check_for_help_request_triggers_gui(monkeypatch):
     assert calls == [True]
 
 
+@pytest.mark.gui
 def test_check_for_help_request_passthrough(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["prog", "--help"])
     monkeypatch.setattr(main, "is_console_available", lambda: True)
@@ -35,6 +39,7 @@ def test_check_for_help_request_passthrough(monkeypatch):
     assert main.check_for_help_request() is False
 
 
+@pytest.mark.gui
 def test_generate_gui_help_content_contains_expected_sections():
     content = main.generate_gui_help_content()
     assert "DTA File Transfer Log" in content
@@ -93,6 +98,7 @@ def test_main_returns_early_on_help(monkeypatch):
     main.main()
 
 
+@pytest.mark.gui
 def test_main_runs_gui_path_with_dummy_qt(monkeypatch, tmp_path):
     # Force GUI path (no CLI args, help returns False)
     monkeypatch.setattr(sys, "argv", ["prog"])  # triggers GUI path
