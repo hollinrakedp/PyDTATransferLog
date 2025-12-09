@@ -42,7 +42,7 @@ jobs:
       - name: Type check with mypy
         run: mypy src --ignore-missing-imports
 
-  # Job 2: CLI and utility testing (Windows + Ubuntu, all Python versions)
+  # Job 2: CLI and utility testing (Windows + Ubuntu, Python 3.13 only)
   # Tests CLI functionality and non-GUI code
   test-cli:
     name: Test CLI
@@ -50,7 +50,6 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
     
     runs-on: ${{ matrix.os }}
     
@@ -58,10 +57,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -82,7 +81,7 @@ jobs:
         if: runner.os == 'Windows' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: coverage-report-${{ matrix.os }}
           path: htmlcov/
           retention-days: 7
 
@@ -119,14 +118,11 @@ jobs:
           rm -rf test_file.txt test_folder test_logs test_requests 2>/dev/null || true
         shell: bash
 
-  # Job 3: GUI testing (Windows only, all Python versions)
+  # Job 3: GUI testing (Windows only, Python 3.13)
   # PySide6 tests require display server
   test-gui:
     name: Test GUI
     needs: lint-and-check
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
     
     runs-on: windows-latest
     
@@ -134,10 +130,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
