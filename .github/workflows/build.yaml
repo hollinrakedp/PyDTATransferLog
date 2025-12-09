@@ -320,7 +320,7 @@ jobs:
             libxkbcommon0 \
             libxcb-render0 \
             libxcb-shm0 \
-            libtiff5 \
+            libtiff6 \
             libgtk-3-0
 
       - name: Install dependencies
