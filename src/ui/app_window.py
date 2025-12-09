@@ -1,8 +1,16 @@
 import os
 import sys
 
-from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+try:
+    from PySide6.QtGui import QAction, QIcon
+    from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs; runtime will guard
+    QAction = None
+    QIcon = None
+    QMainWindow = None
+    QMessageBox = None
+    QTabWidget = None
 
 from ui.log_window import FileTransferLoggerTab
 from ui.request_window import FileTransferRequestTab

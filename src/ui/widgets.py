@@ -2,9 +2,19 @@
 
 import os
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QPainter, QPen
-from PySide6.QtWidgets import QListWidget
+try:
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QPainter, QPen
+    from PySide6.QtWidgets import QListWidget
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs
+    Qt = None
+    QDragEnterEvent = None
+    QDragMoveEvent = None
+    QDropEvent = None
+    QPainter = None
+    QPen = None
+    QListWidget = None
 
 from utils.file_utils import get_all_files
 

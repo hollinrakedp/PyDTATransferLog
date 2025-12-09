@@ -6,26 +6,48 @@ import socket
 import subprocess
 import sys
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDateEdit,
-    QFileDialog,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QMessageBox,
-    QProgressDialog,
-    QPushButton,
-    QSizePolicy,
-    QSpacerItem,
-    QVBoxLayout,
-    QWidget,
-)
+try:
+    from PySide6.QtCore import QDate, Qt
+    from PySide6.QtGui import QAction
+    from PySide6.QtWidgets import (
+        QCheckBox,
+        QComboBox,
+        QDateEdit,
+        QFileDialog,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMessageBox,
+        QProgressDialog,
+        QPushButton,
+        QSizePolicy,
+        QSpacerItem,
+        QVBoxLayout,
+        QWidget,
+    )
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs
+    QDate = None
+    Qt = None
+    QAction = None
+    QCheckBox = None
+    QComboBox = None
+    QDateEdit = None
+    QFileDialog = None
+    QGroupBox = None
+    QHBoxLayout = None
+    QLabel = None
+    QLineEdit = None
+    QListWidget = None
+    QMessageBox = None
+    QProgressDialog = None
+    QPushButton = None
+    QSizePolicy = None
+    QSpacerItem = None
+    QVBoxLayout = None
+    QWidget = None
 
 from constants import TRANSFER_LOG_HEADERS
 from models.log_model import TransferLog

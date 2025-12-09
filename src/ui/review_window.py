@@ -1,24 +1,45 @@
 import datetime
 import os
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDateEdit,
-    QFileDialog,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QSplitter,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+try:
+    from PySide6.QtCore import QDate, Qt
+    from PySide6.QtGui import QAction, QIcon
+    from PySide6.QtWidgets import (
+        QComboBox,
+        QDateEdit,
+        QFileDialog,
+        QHBoxLayout,
+        QHeaderView,
+        QLabel,
+        QLineEdit,
+        QMessageBox,
+        QPushButton,
+        QSplitter,
+        QTreeWidget,
+        QTreeWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs
+    QDate = None
+    Qt = None
+    QAction = None
+    QIcon = None
+    QComboBox = None
+    QDateEdit = None
+    QFileDialog = None
+    QHBoxLayout = None
+    QHeaderView = None
+    QLabel = None
+    QLineEdit = None
+    QMessageBox = None
+    QPushButton = None
+    QSplitter = None
+    QTreeWidget = None
+    QTreeWidgetItem = None
+    QVBoxLayout = None
+    QWidget = None
 
 from constants import TRANSFER_LOG_HEADERS
 from models.review_model import ReviewModel

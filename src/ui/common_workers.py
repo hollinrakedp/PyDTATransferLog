@@ -7,7 +7,12 @@ UI components (log_window.py and request_window.py).
 
 import os
 
-from PySide6.QtCore import QThread, Signal
+try:
+    from PySide6.QtCore import QThread, Signal
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs
+    QThread = None
+    Signal = None
 
 from utils.file_utils import calculate_file_hash
 
