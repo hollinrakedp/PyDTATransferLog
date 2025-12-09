@@ -304,17 +304,62 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build executable with PyInstaller
-        run: pyinstaller main.spec
+        shell: bash
+        run: |
+          echo "Starting PyInstaller build..."
+          pyinstaller main.spec
+          echo "Build completed. Checking dist directory..."
+          ls -la dist/
+          
+          # Check if executables exist
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            if [[ ! -f "dist/dtatransferlog.exe" ]]; then
+              echo "ERROR: dtatransferlog.exe not found!"
+              ls -la dist/
+              exit 1
+            fi
+            if [[ ! -f "dist/dtatransferlog-cli.exe" ]]; then
+              echo "ERROR: dtatransferlog-cli.exe not found!"
+              ls -la dist/
+              exit 1
+            fi
+          else
+            if [[ ! -f "dist/dtatransferlog" ]]; then
+              echo "ERROR: dtatransferlog not found!"
+              ls -la dist/
+              exit 1
+            fi
+          fi
 
       - name: Test built executable
         shell: bash
         run: |
+          echo "Testing built executable..."
+          
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./dist/dtatransferlog-cli.exe --version
-            ./dist/dtatransferlog-cli.exe --help
+            if [[ -f "./dist/dtatransferlog.exe" ]]; then
+              ./dist/dtatransferlog.exe --version || true
+              ./dist/dtatransferlog.exe --help || true
+            else
+              echo "ERROR: dtatransferlog.exe not found in dist/"
+              exit 1
+            fi
+            if [[ -f "./dist/dtatransferlog-cli.exe" ]]; then
+              ./dist/dtatransferlog-cli.exe --version
+              ./dist/dtatransferlog-cli.exe --help
+            else
+              echo "ERROR: dtatransferlog-cli.exe not found in dist/"
+              exit 1
+            fi
           else
-            ./dist/dtatransferlog-cli --version
-            ./dist/dtatransferlog-cli --help
+            if [[ -f "./dist/dtatransferlog" ]]; then
+              chmod +x ./dist/dtatransferlog
+              ./dist/dtatransferlog --version
+              ./dist/dtatransferlog --help
+            else
+              echo "ERROR: dtatransferlog not found in dist/"
+              exit 1
+            fi
           fi
 
       - name: Verify dist directory

@@ -80,3 +80,25 @@ if IS_WINDOWS:
         icon=ICON_FILE,
         version=VERSION_FILE
     )
+    # Collection for Windows: both GUI and CLI
+    coll = COLLECT(
+        exe_main,
+        exe_cli,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='dist'
+    )
+else:
+    # Collection for Linux/Mac: only main executable
+    coll = COLLECT(
+        exe_main,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='dist'
+    )
