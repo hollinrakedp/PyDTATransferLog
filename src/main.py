@@ -1,8 +1,25 @@
 import os
 import sys
 
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout
+try:
+    from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import (
+        QApplication,
+        QDialog,
+        QHBoxLayout,
+        QPushButton,
+        QTextEdit,
+        QVBoxLayout,
+    )
+except ImportError:
+    # Allow import in headless test environments lacking Qt libs; runtime will guard
+    QFont = None
+    QApplication = None
+    QDialog = None
+    QHBoxLayout = None
+    QPushButton = None
+    QTextEdit = None
+    QVBoxLayout = None
 
 from cli.handlers import create_gui_parser, run_cli, run_request_cli
 from ui.app_window import DTATransferLogApp
@@ -55,6 +72,12 @@ For detailed documentation, use Help > Documentation from the menu bar."""
 
 def show_gui_help():
     """Show help information in a GUI dialog when console is not available"""
+    if QApplication is None:
+        raise ImportError(
+            "PySide6 is required for GUI help display. "
+            "Install system Qt dependencies (e.g., libEGL) and PySide6."
+        )
+
     # Create a minimal QApplication if one doesn't exist
     app = QApplication.instance()
     if app is None:
@@ -164,6 +187,12 @@ def main():
             os.chdir(original_cwd)
             run_request_cli()
             return
+
+    if QApplication is None:
+        raise ImportError(
+            "PySide6 is required for GUI mode. "
+            "Ensure Qt runtime libraries (e.g., libEGL) are installed."
+        )
 
     # Load configuration
     config = ConfigManager("config.ini")
