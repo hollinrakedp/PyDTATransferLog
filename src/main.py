@@ -173,8 +173,9 @@ def main():
             return
 
     # Import GUI components only when running in GUI mode
-    from ui.app_window import DTATransferLogApp
     from PySide6.QtWidgets import QApplication
+
+    from ui.app_window import DTATransferLogApp
 
     # Load configuration
     config = ConfigManager("config.ini")
