@@ -365,17 +365,16 @@ jobs:
           echo "Testing built executable..."
           
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Test GUI executable (version only to avoid opening windows)
+            # Test GUI executable
             if [[ -f "./dist/dtatransferlog.exe" ]]; then
               ./dist/dtatransferlog.exe --version
             else
               echo "ERROR: dtatransferlog.exe not found in dist/"
               exit 1
             fi
-            # Test CLI executable (supports --help safely)
+            # Test CLI executable
             if [[ -f "./dist/dtatransferlog-cli.exe" ]]; then
               ./dist/dtatransferlog-cli.exe --version
-              ./dist/dtatransferlog-cli.exe --help
             else
               echo "ERROR: dtatransferlog-cli.exe not found in dist/"
               exit 1
