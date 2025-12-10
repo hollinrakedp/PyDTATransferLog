@@ -250,6 +250,11 @@ jobs:
         id: version
         shell: bash
         run: |
+          # Activate venv on RHEL9
+          if [[ "${{ matrix.os }}" == "rhel9" ]]; then
+            source venv/bin/activate
+          fi
+          
           python_cmd="python"
           if [[ "${{ matrix.os }}" == "rhel9" ]]; then
             python_cmd="python${{ env.PYTHON_VERSION }}"
@@ -367,6 +372,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             # Test GUI executable
             if [[ -f "./dist/dtatransferlog.exe" ]]; then
+              echo "Testing GUI executable..."
               ./dist/dtatransferlog.exe --version
             else
               echo "ERROR: dtatransferlog.exe not found in dist/"
@@ -374,14 +380,16 @@ jobs:
             fi
             # Test CLI executable
             if [[ -f "./dist/dtatransferlog-cli.exe" ]]; then
+              echo "Testing CLI executable..."
               ./dist/dtatransferlog-cli.exe --version
             else
               echo "ERROR: dtatransferlog-cli.exe not found in dist/"
               exit 1
             fi
           else
-            # Test Linux/RHEL executable (version only to avoid GUI)
+            # Test Linux executable (version only to avoid GUI)
             if [[ -f "./dist/dtatransferlog" ]]; then
+              echo "Testing Linux executable..."
               chmod +x ./dist/dtatransferlog
               ./dist/dtatransferlog --version
             else
