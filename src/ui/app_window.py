@@ -1,12 +1,12 @@
 import os
 import sys
-import datetime
-from PySide6.QtWidgets import (QMainWindow, QTabWidget, QMessageBox)
-from PySide6.QtGui import QIcon, QAction
-from PySide6.QtCore import Qt
+
+from PySide6.QtGui import QAction, QIcon
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+
 from ui.log_window import FileTransferLoggerTab
-from ui.review_window import TransferLogReviewerTab
 from ui.request_window import FileTransferRequestTab
+from ui.review_window import TransferLogReviewerTab
 from version import VERSION
 
 
@@ -26,7 +26,7 @@ class DTATransferLogApp(QMainWindow):
         else:
             # Normal Execution
             icon_path = os.path.join("resources", "icons", "dtatransferlog.png")
-        
+
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         else:

@@ -1,36 +1,103 @@
-import os
-import hashlib
-import re
 import datetime
+import getpass
+import hashlib
+import os
+import re
 import socket
+from dataclasses import dataclass
+
+
+@dataclass
+class FileInfo:
+    """Class for tracking file information"""
+    path: str
+    sha256: str = ""
+    size: int | None = None
+
+    @property
+    def name(self) -> str:
+        """Get the file name"""
+        return os.path.basename(self.path)
+
+    @property
+    def directory(self) -> str:
+        """Get the directory containing the file"""
+        return os.path.dirname(self.path)
+
+    @property
+    def full_path(self) -> str:
+        """Get the absolute path for compatibility with legacy tests"""
+        return os.path.abspath(self.path)
+
+    @property
+    def size_str(self) -> str:
+        """Get the file size as a string"""
+        if self.size is None:
+            try:
+                self.size = os.path.getsize(self.path)
+            except (OSError, ValueError):
+                return ""
+
+        if self.size < 1024:
+            return f"{self.size} B"
+        elif self.size < 1024*1024:
+            return f"{self.size/1024:.2f} KB"
+        elif self.size < 1024*1024*1024:
+            return f"{self.size/(1024*1024):.2f} MB"
+        else:
+            return f"{self.size/(1024*1024*1024):.2f} GB"
+
+    @staticmethod
+    def get_container_filename(container_path):
+        """Extract just the filename portion of a container path"""
+        if not container_path:
+            return ""
+        return os.path.basename(container_path)
+
+
+def format_display_path(path):
+    """
+    Format path for CSV display using OS-native separators.
+
+    Args:
+        path: File path to normalize
+
+    Returns:
+        Normalized absolute path with OS-native separators
+    """
+    try:
+        return os.path.normpath(os.path.abspath(path))
+    except (OSError, ValueError, TypeError):
+        return path
+
 
 def get_all_files(directory):
     """
     Recursively get all files in a directory
-    
+
     Args:
         directory (str): Directory path to scan
-    
+
     Returns:
         list: List of absolute file paths
     """
     files = []
-    
+
     for root, _, filenames in os.walk(directory):
         for filename in filenames:
             files.append(os.path.join(root, filename))
-            
+
     return files
 
 def calculate_file_hash(filepath, algorithm='sha256', buffer_size=65536):
     """
     Calculate a file hash using the specified algorithm
-    
+
     Args:
         filepath (str): Path to the file
         algorithm (str): Hash algorithm to use (default: sha256)
         buffer_size (int): Size of buffer for reading the file
-    
+
     Returns:
         str: Hexadecimal hash digest
     """
@@ -40,22 +107,32 @@ def calculate_file_hash(filepath, algorithm='sha256', buffer_size=65536):
         hash_obj = hashlib.md5()
     else:
         raise ValueError(f"Unsupported hash algorithm: {algorithm}")
-    
+
     with open(filepath, 'rb') as f:
         buffer = f.read(buffer_size)
         while len(buffer) > 0:
             hash_obj.update(buffer)
             buffer = f.read(buffer_size)
-            
+
     return hash_obj.hexdigest()
+
+
+def get_file_info(filepath: str) -> FileInfo:
+    """Legacy helper to return FileInfo with populated size and path data"""
+    normalized_path = format_display_path(filepath)
+    try:
+        size = os.path.getsize(normalized_path)
+    except (OSError, ValueError):
+        size = None
+    return FileInfo(path=normalized_path, size=size)
 
 def get_file_size_str(size_bytes):
     """
     Convert file size in bytes to a human-readable string
-    
+
     Args:
         size_bytes (int): File size in bytes
-    
+
     Returns:
         str: Human-readable file size
     """
@@ -71,10 +148,10 @@ def get_file_size_str(size_bytes):
 def is_valid_file(filepath):
     """
     Check if a file exists and is accessible
-    
+
     Args:
         filepath (str): Path to the file
-    
+
     Returns:
         bool: True if the file exists and is accessible, False otherwise
     """
@@ -83,57 +160,57 @@ def is_valid_file(filepath):
 def format_filename(template, data=None, config=None, counter=1):
     """
     Format a filename template by replacing tokens with their values.
-    
+
     Args:
         template: The filename template with tokens like {date}, {username}, etc.
         data: Dictionary with additional data values
         config: Config object for accessing configuration values
         counter: Counter value for the {counter} token
-        
+
     Returns:
         The formatted filename with all tokens replaced
     """
     if not data:
         data = {}
-    
+
     # Base replacements (always available)
     now = datetime.datetime.now()
     replacements = {
-        'username': os.getlogin(),
+        'username': getpass.getuser(),
         'computername': socket.gethostname(),
         'counter': str(counter).zfill(3),
         'year': now.strftime("%Y"),
         'timestamp': now.strftime("%Y%m%d-%H%M%S")
     }
-    
+
     # Determine transfer directionality
     if config and 'source' in data and 'destination' in data:
         local_network = config.get("UI", "LocalNetwork", fallback="")
         direction = "Unknown"
-        
+
         if local_network:
             if data.get('destination') == local_network:
                 direction = "Incoming"
             elif data.get('source') == local_network:
                 direction = "Outgoing"
-        
+
         # Add direction to replacements
         replacements['direction'] = direction
-    
+
     # Date and time formats
     date_format = config.get("Logging", "DateFormat", fallback="yyyyMMdd") if config else "yyyyMMdd"
     time_format = config.get("Logging", "TimeFormat", fallback="HHmmss") if config else "HHmmss"
-    
+
     # Convert Python date format from config format
     date_format = date_format.replace("yyyy", "%Y").replace("yy", "%y").replace("MMMM", "%B").replace("MMM", "%b").replace("MM", "%m").replace("dd", "%d")
     time_format = time_format.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
-    
+
     replacements['date'] = now.strftime(date_format)
     replacements['time'] = now.strftime(time_format)
-    
+
     # Add any additional data
     replacements.update(data)
-    
+
     def replace_token(match):
         token = match.group(1)
         if ':' in token:
@@ -149,13 +226,13 @@ def format_filename(template, data=None, config=None, counter=1):
                 return replacements.get(name, match.group(0))
         else:
             return replacements.get(token, match.group(0))
-    
+
     # Replace tokens in the template
     result = re.sub(r'\{([^}]+)\}', replace_token, template)
-    
+
     # Make sure the filename is valid
     result = sanitize_filename(result)
-    
+
     return result
 
 
@@ -167,11 +244,11 @@ def sanitize_filename(filename):
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '_')
-    
+
     # Ensure filename isn't too long
     max_length = 240  # Windows MAX_PATH is 260, leave room for path
     if len(filename) > max_length:
         name, ext = os.path.splitext(filename)
         filename = name[:max_length-len(ext)] + ext
-        
+
     return filename

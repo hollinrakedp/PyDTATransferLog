@@ -1,240 +1,34 @@
 import datetime
+import getpass
 import os
 import socket
 import subprocess
 import sys
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton,
-                               QDateEdit, QFileDialog, QMessageBox, QListWidget,
-                               QSizePolicy, QProgressDialog, QTreeWidget,
-                               QTreeWidgetItem, QCheckBox, QGroupBox, QSpacerItem,
-                               QTextEdit)
-from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import (QIcon, QAction, QPainter, QPen,
-                           QDragEnterEvent, QDragMoveEvent, QDragLeaveEvent, QDropEvent)
-from utils.file_utils import calculate_file_hash, get_all_files
+
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDateEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 from models.request_model import RequestLog
-from constants import REQUEST_FILE_LIST_HEADERS
-
-
-class RequestHashWorker(QThread):
-    """Worker thread for calculating file hashes for requests"""
-    progress = Signal(int)
-    finished = Signal(dict)
-
-    def __init__(self, files):
-        super().__init__()
-        self.files = files
-        self.hashes = {}
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the hash operation"""
-        self.canceled = True
-
-    def run(self):
-        total = len(self.files)
-        for i, file in enumerate(self.files):
-            # Check if canceled
-            if self.canceled:
-                self.finished.emit({})
-                return
-
-            try:
-                self.hashes[file] = calculate_file_hash(file)
-                self.progress.emit(int((i + 1) / total * 100))
-            except Exception as e:
-                self.hashes[file] = f"ERROR: {str(e)}"
-        self.finished.emit(self.hashes)
-
-
-class RequestProcessingWorker(QThread):
-    """Worker thread for processing request files"""
-    progress = Signal(int)
-    finished = Signal(str)
-
-    def __init__(self, request_log, files, file_hashes, base_log_dir, file_list_dir):
-        super().__init__()
-        self.request_log = request_log
-        self.files = files
-        self.file_hashes = file_hashes
-        self.base_log_dir = base_log_dir
-        self.file_list_dir = file_list_dir
-        self.canceled = False
-
-    def cancel(self):
-        """Cancel the request processing operation"""
-        self.canceled = True
-
-    def run(self):
-        # Check if already canceled
-        if self.canceled:
-            self.finished.emit("")
-            return
-
-        file_list_path = ""
-        try:
-            # Process the file list
-            if not self.canceled:
-                file_list_path = self.request_log._save_file_list_with_progress(
-                    self.file_list_dir, self.files, self.file_hashes, self.progress,
-                    lambda: self.canceled)
-
-            # Delete the file list if canceled
-            if self.canceled and file_list_path and os.path.exists(file_list_path):
-                try:
-                    os.remove(file_list_path)
-                    file_list_path = ""
-                except Exception as e:
-                    print(f"Error deleting file list after cancellation: {str(e)}")
-
-            # Create the annual request log if enabled
-            if file_list_path and not self.canceled:
-                enable_request_log = self.request_log.config.get("Requests", "EnableRequestLog", fallback="true").lower() == "true"
-                if enable_request_log:
-                    year = datetime.datetime.now().strftime("%Y")
-                    request_log_name = self.request_log.config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
-                    request_log_name = request_log_name.replace("{year}", year)
-                    csv_file = os.path.join(self.base_log_dir, request_log_name)
-                    
-                    # Format timestamp for CSV
-                    ts = self.request_log.timestamp
-                    formatted_timestamp = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-                    
-                    # Write to request log
-                    self.request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
-
-        except Exception as e:
-            print(f"Error in request processing: {str(e)}")
-            file_list_path = ""
-
-        self.finished.emit(file_list_path)
-
-
-class RequestDropListWidget(QListWidget):
-    """Custom QListWidget that accepts drag and drop files"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.main_window = parent
-        self.setAcceptDrops(True)
-        self.setDragDropMode(QListWidget.DropOnly)
-
-        # Set minimum height to ensure the drop hint is visible
-        self.setMinimumHeight(100)
-
-    def dragEnterEvent(self, event: QDragEnterEvent):
-        """Accept the drag if it contains file URLs or text"""
-        if event.mimeData().hasUrls() or event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def dragMoveEvent(self, event):
-        """Accept the drag movement if it contains file URLs or text"""
-        if event.mimeData().hasUrls() or event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event: QDropEvent):
-        """Process dropped files and folders"""
-        mime_data = event.mimeData()
-
-        # Process URLs (files and folders)
-        if mime_data.hasUrls():
-            self.process_dropped_urls(mime_data.urls())
-        # Process text (might be file paths)
-        elif mime_data.hasText():
-            self.process_dropped_text(mime_data.text())
-
-        event.acceptProposedAction()
-
-    def process_dropped_urls(self, urls):
-        """Process dropped URLs"""
-        files = []
-        folders = []
-
-        for url in urls:
-            if url.isLocalFile():
-                file_path = url.toLocalFile()
-                if os.path.isfile(file_path):
-                    files.append(file_path)
-                elif os.path.isdir(file_path):
-                    folders.append(file_path)
-
-        # Process all files and folders
-        self._process_files_and_folders(files, folders)
-
-    def process_dropped_text(self, text):
-        """Process dropped text as potential file paths"""
-        paths = text.strip().split('\n')
-        files = []
-        folders = []
-
-        for path in paths:
-            path = path.strip()
-            if os.path.isfile(path):
-                files.append(path)
-            elif os.path.isdir(path):
-                folders.append(path)
-
-        # Process all files and folders
-        self._process_files_and_folders(files, folders)
-
-    def _process_files_and_folders(self, files, folders):
-        """Process lists of files and folders"""
-        # Add individual files
-        added_count = 0
-        for file in files:
-            if self.main_window._add_file(file):
-                added_count += 1
-
-        # Process folders
-        for folder in folders:
-            self.main_window.app.set_status_message(f"Scanning folder: {folder}")
-
-            try:
-                folder_files = get_all_files(folder)
-                for file in folder_files:
-                    if self.main_window._add_file(file):
-                        added_count += 1
-            except Exception as e:
-                self.main_window.app.set_status_message(f"Error scanning folder: {str(e)}")
-
-        # Update file count
-        self.main_window._update_file_stats()
-        self.main_window.app.set_status_message(f"Added {len(files)} files and processed {len(folders)} folders")
-
-    def paintEvent(self, event):
-        """Override paint event to show drag-drop hint when empty"""
-        super().paintEvent(event)
-
-        # Only show hint when the list is empty
-        if self.count() == 0:
-            painter = QPainter(self.viewport())
-            painter.save()
-
-            # Draw dashed border
-            pen = QPen(Qt.DashLine)
-            pen.setColor(Qt.gray)
-            pen.setWidth(1)
-            painter.setPen(pen)
-            painter.drawRect(5, 5, self.width() - 10, self.height() - 10)
-
-            # Draw text
-            font = painter.font()
-            font.setBold(True)
-            painter.setFont(font)
-
-            # Draw icon
-            icon_text = "📁➕"
-            text = "Drag and drop files or folders here"
-
-            painter.drawText(
-                self.rect(),
-                Qt.AlignCenter,
-                f"{icon_text}\n\n{text}"
-            )
-
-            painter.restore()
+from ui.common_workers import FileHashWorker, FileProcessingWorker
+from ui.widgets import DragDropFileListWidget
+from utils.file_utils import get_all_files, get_file_size_str
 
 
 class FileTransferRequestTab(QWidget):
@@ -290,7 +84,7 @@ class FileTransferRequestTab(QWidget):
         requestor_label.setFixedWidth(label_width)
         requestor_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         requestor_layout.addWidget(requestor_label)
-        self.requestor_edit = QLineEdit(os.getlogin())
+        self.requestor_edit = QLineEdit(getpass.getuser())
         requestor_layout.addWidget(self.requestor_edit)
         left_layout.addLayout(requestor_layout)
 
@@ -354,7 +148,7 @@ class FileTransferRequestTab(QWidget):
         button_layout = QHBoxLayout()
 
         button_width = 120  # Width that accommodates "Remove Selected" with padding
-        
+
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_selected_files)
         clear_btn.setFixedWidth(button_width)
@@ -366,7 +160,7 @@ class FileTransferRequestTab(QWidget):
         remove_selected_btn.setFixedWidth(button_width)
         remove_selected_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         button_layout.addWidget(remove_selected_btn)
-        
+
         # Add stretch in the middle to separate the button groups
         button_layout.addStretch()
 
@@ -394,7 +188,7 @@ class FileTransferRequestTab(QWidget):
         right_layout.addLayout(stats_layout)
 
         # File list (with drag and drop support)
-        self.file_list = RequestDropListWidget(self)
+        self.file_list = DragDropFileListWidget(self)
         right_layout.addWidget(self.file_list)
 
         # Create Request button
@@ -462,13 +256,13 @@ class FileTransferRequestTab(QWidget):
         """Open file dialog to select files"""
         files, _ = QFileDialog.getOpenFileNames(
             self, "Select Files to Request", "", "All Files (*)")
-        
+
         if files:
             added_count = 0
             for file_path in files:
                 if self._add_file(file_path):
                     added_count += 1
-            
+
             self._update_file_stats()
             if added_count > 0:
                 self.app.set_status_message(f"Added {added_count} files to request")
@@ -476,21 +270,21 @@ class FileTransferRequestTab(QWidget):
     def select_folder(self):
         """Open folder dialog to select a folder and add all files"""
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
-        
+
         if folder:
             self.app.set_status_message(f"Scanning folder: {folder}")
-            
+
             try:
                 files = get_all_files(folder)
                 added_count = 0
                 for file_path in files:
                     if self._add_file(file_path):
                         added_count += 1
-                
+
                 self._update_file_stats()
                 self.app.set_status_message(f"Added {added_count} files from folder")
             except Exception as e:
-                QMessageBox.warning(self, "Error", f"Error scanning folder: {str(e)}")
+                QMessageBox.warning(self, "Error", f"Error scanning folder: {e!s}")
                 self.app.set_status_message("Error scanning folder")
 
     def _add_file(self, file_path):
@@ -498,7 +292,7 @@ class FileTransferRequestTab(QWidget):
         try:
             # Normalize the path for comparison
             normalized_path = self._normalize_path(file_path)
-            
+
             # Check if file already exists in the list
             if normalized_path in self.normalized_paths:
                 return False
@@ -510,19 +304,19 @@ class FileTransferRequestTab(QWidget):
             # Add to lists
             self.selected_files.append(file_path)
             self.normalized_paths.add(normalized_path)
-            
+
             # Add to UI list
             self.file_list.addItem(file_path)
-            
+
             # Update total size
             try:
                 self.total_size += os.path.getsize(file_path)
-            except:
+            except OSError:
                 pass  # Ignore size calculation errors
-            
+
             return True
         except Exception as e:
-            self.app.set_status_message(f"Error adding file {file_path}: {str(e)}")
+            self.app.set_status_message(f"Error adding file {file_path}: {e!s}")
             return False
 
     def _normalize_path(self, path):
@@ -535,23 +329,23 @@ class FileTransferRequestTab(QWidget):
         if current_row >= 0:
             # Get the file path
             file_path = self.selected_files[current_row]
-            
+
             # Remove from data structures
             self.selected_files.pop(current_row)
             normalized_path = self._normalize_path(file_path)
             self.normalized_paths.discard(normalized_path)
-            
+
             # Update total size
             try:
                 self.total_size -= os.path.getsize(file_path)
                 if self.total_size < 0:
                     self.total_size = 0
-            except:
-                pass
-            
+            except OSError:
+                pass  # File may have been deleted or is inaccessible
+
             # Remove from UI
             self.file_list.takeItem(current_row)
-            
+
             # Update stats
             self._update_file_stats()
 
@@ -567,19 +361,12 @@ class FileTransferRequestTab(QWidget):
         """Update the file count and total size labels"""
         file_count = len(self.selected_files)
         self.file_count_label.setText(f"Files: {file_count}")
-        
+
         # Format total size
-        if self.total_size < 1024:
-            size_str = f"{self.total_size} B"
-        elif self.total_size < 1024*1024:
-            size_str = f"{self.total_size/1024:.2f} KB"
-        elif self.total_size < 1024*1024*1024:
-            size_str = f"{self.total_size/(1024*1024):.2f} MB"
-        else:
-            size_str = f"{self.total_size/(1024*1024*1024):.2f} GB"
-        
+        size_str = get_file_size_str(self.total_size)
+
         self.total_size_label.setText(f"Total Size: {size_str}")
-        
+
         # Note: Create request button is always enabled (consistent with Log Transfer button)
         # Validation happens when user clicks the button
 
@@ -652,14 +439,14 @@ class FileTransferRequestTab(QWidget):
         progress_dialog.show()
 
         # Create and start hash worker
-        self.hash_worker = RequestHashWorker(self.selected_files)
+        self.hash_worker = FileHashWorker(self.selected_files)
         self.hash_worker.progress.connect(progress_dialog.setValue)
         self.hash_worker.finished.connect(
             lambda hashes: self._on_hashes_calculated(hashes, request_log, base_request_dir, file_list_dir, progress_dialog)
             if hashes else None
         )
         progress_dialog.canceled.connect(self.hash_worker.cancel)
-        
+
         self.hash_worker.start()
 
     def _on_hashes_calculated(self, hashes, request_log, base_request_dir, file_list_dir, progress_dialog):
@@ -676,13 +463,26 @@ class FileTransferRequestTab(QWidget):
         progress_dialog.setMinimumDuration(0)
         progress_dialog.show()
 
+        # Create callback for saving annual request log (if enabled)
+        def save_request_log_callback(base_dir, formatted_timestamp, file_list_path):
+            enable_request_log = request_log.config.get("Requests", "EnableRequestLog", fallback="true").lower() == "true"
+            if enable_request_log:
+                year = datetime.datetime.now().strftime("%Y")
+                request_log_name = request_log.config.get("Requests", "RequestLogName", fallback="RequestLog_{year}.log")
+                request_log_name = request_log_name.replace("{year}", year)
+                csv_file = os.path.join(base_dir, request_log_name)
+
+                # Write to request log
+                request_log._save_request_log(csv_file, formatted_timestamp, file_list_path)
+
         # Create and start processing worker
-        self.processing_worker = RequestProcessingWorker(
-            request_log, self.selected_files, file_hashes, base_request_dir, file_list_dir)
+        self.processing_worker = FileProcessingWorker(
+            request_log, self.selected_files, file_hashes, base_request_dir, file_list_dir,
+            save_callback=save_request_log_callback)
         self.processing_worker.progress.connect(progress_dialog.setValue)
         self.processing_worker.finished.connect(lambda path: self._on_request_created(path, progress_dialog))
         progress_dialog.canceled.connect(self.processing_worker.cancel)
-        
+
         self.processing_worker.start()
 
         # Keep progress dialog responsive
@@ -692,11 +492,11 @@ class FileTransferRequestTab(QWidget):
     def _on_request_created(self, file_list_path, progress_dialog):
         """Handle request creation completion"""
         progress_dialog.close()
-        
+
         if file_list_path:
-            QMessageBox.information(self, "Success", 
+            QMessageBox.information(self, "Success",
                                   f"Request created successfully!\n\nFile list saved to:\n{file_list_path}")
-            
+
             # Open the files if requested
             if self.open_request_log_check.isChecked():
                 try:
@@ -707,8 +507,8 @@ class FileTransferRequestTab(QWidget):
                     else:  # Linux and other Unix-like
                         subprocess.call(['xdg-open', file_list_path])
                 except Exception as e:
-                    self.app.set_status_message(f"Error opening file: {str(e)}")
-                    
+                    self.app.set_status_message(f"Error opening file: {e!s}")
+
             self.app.set_status_message("Request created successfully")
         else:
             QMessageBox.warning(self, "Error", "Failed to create request")
@@ -721,11 +521,11 @@ class FileTransferRequestTab(QWidget):
             if success:
                 # Update UI components with new config values
                 self.app.set_status_message("Configuration reloaded successfully")
-                
+
                 # Update request output folder display
                 request_output_folder = self.config.get("Requests", "OutputFolder", fallback="./requests")
                 self.request_folder_edit.setText(os.path.abspath(request_output_folder))
-                
+
                 # Notify parent app
                 if hasattr(self.app, 'on_config_reloaded'):
                     self.app.on_config_reloaded()
@@ -733,5 +533,5 @@ class FileTransferRequestTab(QWidget):
                 QMessageBox.warning(self, "Error", "Failed to reload configuration file")
                 self.app.set_status_message("Configuration reload failed")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error reloading configuration: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Error reloading configuration: {e!s}")
             self.app.set_status_message("Configuration reload error")
