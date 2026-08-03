@@ -186,7 +186,7 @@ jobs:
           git diff --staged --quiet || git commit -m "Auto-increment build number [skip ci]"
           git push
 
-  # Job 5: Build executables (Windows, Ubuntu, RHEL9)
+  # Job 5: Build executables (Windows, Ubuntu, RHEL8/9/10)
   # Depends on all testing completing (version update is optional on main branch)
   build:
     name: Build Executable
@@ -200,8 +200,12 @@ jobs:
             artifact-name: dta-transfer-log-windows
           - os: ubuntu-latest
             artifact-name: dta-transfer-log-ubuntu
+          - os: rhel8
+            artifact-name: dta-transfer-log-rhel9
           - os: rhel9
             artifact-name: dta-transfer-log-rhel9
+          - os: rhel10
+            artifact-name: dta-transfer-log-rhel10
 
     runs-on: ${{ matrix.os }}
 
@@ -212,31 +216,42 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Set up Python
-        if: matrix.os != 'rhel9'
+        if: matrix.os != 'rhel8' && matrix.os != 'rhel9' && matrix.os != 'rhel10'
         uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Setup Python on RHEL9
-        if: matrix.os == 'rhel9'
+      - name: Setup Python on RHEL
+        if: matrix.os == 'rhel8' || matrix.os == 'rhel9' || matrix.os == 'rhel10'
         shell: bash
         run: |
-          PYTHON_CMD="python${{ env.PYTHON_VERSION }}"
+          if [ "${{ matrix.os }}" = "rhel8" ]; then
+            PY_VER="3.12"
+          else
+            PY_VER="${{ env.PYTHON_VERSION }}"
+          fi
+          PYTHON_CMD="python${PY_VER}"
 
-          # Ensure EPEL repository
+          # Ensure EPEL repository exists
           if ! dnf repolist enabled | grep -q epel; then
             echo "Installing EPEL repository..."
-            sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+            if [ "${{ matrix.os }}" = "rhel8" ]; then
+              sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+            elif [ "${{ matrix.os }}" = "rhel9" ]; then
+              sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+            else
+              sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+            fi
           else
             echo "EPEL repository is already available"
           fi
 
           # Check if Python is already installed
           if ! command -v $PYTHON_CMD &> /dev/null; then
-            echo "Installing Python ${{ env.PYTHON_VERSION }}..."
-            sudo dnf install -y python${{ env.PYTHON_VERSION }} python${{ env.PYTHON_VERSION }}-pip python${{ env.PYTHON_VERSION }}-devel
+            echo "Installing Python ${PY_VER}..."
+            sudo dnf install -y python${PY_VER} python${PY_VER}-pip python${PY_VER}-devel
           else
-            echo "Python ${{ env.PYTHON_VERSION }} is already installed"
+            echo "Python ${PY_VER} is already installed"
           fi
           $PYTHON_CMD --version
 
@@ -251,12 +266,12 @@ jobs:
         shell: bash
         run: |
           # Activate venv on RHEL9
-          if [[ "${{ matrix.os }}" == "rhel9" ]]; then
+          if [[ "${{ matrix.os }}" =~ ^rhel(8|9|10)$ ]]; then
             source venv/bin/activate
           fi
           
           python_cmd="python"
-          if [[ "${{ matrix.os }}" == "rhel9" ]]; then
+          if [[ "${{ matrix.os }}" =~ ^rhel(8|9|10)$ ]]; then
             python_cmd="python${{ env.PYTHON_VERSION }}"
           fi
           
