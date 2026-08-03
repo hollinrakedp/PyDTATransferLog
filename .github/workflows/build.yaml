@@ -16,18 +16,18 @@ env:
   PYTHON_VERSION: '3.13'
 
 jobs:
-  # Job 1: Linting and type checking (Windows only, Python 3.13)
-  # Code quality checks are identical regardless of OS, so run once
+  # Job 1: Linting and type checking (Windows only)
+  # Code quality checks are identical regardless of OS
   lint-and-check:
     name: Lint and Type Check
     runs-on: windows-latest
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -42,7 +42,7 @@ jobs:
       - name: Type check with mypy
         run: mypy src --ignore-missing-imports
 
-  # Job 2: CLI and utility testing (Windows + Ubuntu, Python 3.13 only)
+  # Job 2: CLI and utility testing (Windows & Ubuntu)
   # Tests CLI functionality and non-GUI code
   test-cli:
     name: Test CLI
@@ -55,10 +55,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -118,7 +118,7 @@ jobs:
           rm -rf test_file.txt test_folder test_logs test_requests 2>/dev/null || true
         shell: bash
 
-  # Job 3: GUI testing (Windows only, Python 3.13)
+  # Job 3: GUI testing (Windows only)
   # PySide6 tests require display server
   test-gui:
     name: Test GUI
@@ -128,10 +128,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -164,12 +164,12 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -207,13 +207,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
       - name: Set up Python
         if: matrix.os != 'rhel9'
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
