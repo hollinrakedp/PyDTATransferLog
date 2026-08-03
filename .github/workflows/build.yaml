@@ -419,7 +419,7 @@ jobs:
         run: ls -la dist
 
       - name: Upload executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}-v${{ steps.version.outputs.version_short }}-${{ steps.version.outputs.commit_short }}
           path: dist/
