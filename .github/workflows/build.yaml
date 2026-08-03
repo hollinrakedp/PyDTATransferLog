@@ -194,14 +194,14 @@ jobs:
     if: always() && (needs.lint-and-check.result == 'success' && needs.test-cli.result == 'success' && needs.test-gui.result == 'success')
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, rhel9]
+        os: [windows-latest, ubuntu-latest, rhel8, rhel9, rhel10]
         include:
           - os: windows-latest
             artifact-name: dta-transfer-log-windows
           - os: ubuntu-latest
             artifact-name: dta-transfer-log-ubuntu
           - os: rhel8
-            artifact-name: dta-transfer-log-rhel9
+            artifact-name: dta-transfer-log-rhel8
           - os: rhel9
             artifact-name: dta-transfer-log-rhel9
           - os: rhel10
@@ -231,6 +231,7 @@ jobs:
             PY_VER="${{ env.PYTHON_VERSION }}"
           fi
           PYTHON_CMD="python${PY_VER}"
+          echo "PY_VER=${PY_VER}" >> $GITHUB_ENV
 
           # Ensure EPEL repository exists
           if ! dnf repolist enabled | grep -q epel; then
@@ -265,14 +266,14 @@ jobs:
         id: version
         shell: bash
         run: |
-          # Activate venv on RHEL9
+          # Activate venv on RHEL
           if [[ "${{ matrix.os }}" =~ ^rhel(8|9|10)$ ]]; then
             source venv/bin/activate
           fi
           
           python_cmd="python"
           if [[ "${{ matrix.os }}" =~ ^rhel(8|9|10)$ ]]; then
-            python_cmd="python${{ env.PYTHON_VERSION }}"
+            python_cmd="python${{ env.PY_VER }}"
           fi
           
           $python_cmd << 'EOF'
